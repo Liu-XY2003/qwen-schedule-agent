@@ -1,0 +1,14 @@
+# 后端运行时 + 测试依赖
+#
+# 装法:
+#   pip install -r bridge/requirements.txt
+#
+# 推理后端 llama.cpp 不在这里 —— 它是独立的可执行文件, 见 README 的"准备模型"。
+
+fastapi>=0.110,<1.0
+uvicorn[standard]>=0.27,<1.0
+pydantic>=2.5,<3.0
+jsonschema>=4.20,<5.0
+
+# 训练相关依赖 (torch/transformers/peft) 刻意不列 —— 它们体积巨大且只在
+# 需要重新训练时才用得上, 见 pod/requirements-train.txt。

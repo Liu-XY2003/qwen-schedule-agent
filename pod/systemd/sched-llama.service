@@ -1,0 +1,39 @@
+[Unit]
+Description=日程助手 · 推理服务 (llama.cpp + Qwen3-0.6B LoRA + json_schema 约束解码)
+Documentation=file:%h/sched-lora/BACKUP-README.md
+After=network-online.target
+Wants=network-online.target
+# 崩太多次就放弃, 避免无脑重启拖垮共享机器 (注意: 这两个键属于 [Unit] 段)
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+WorkingDirectory=%h/sched-lora
+
+# llama.cpp 预编译包需要的动态库
+Environment=LD_LIBRARY_PATH=%h/sched-lora/llama/llama-b11109:%h/sched-lora/llama/cudart-llama-b11109-bin-ubuntu-cuda-12.8-x64
+
+# 这台机器是共享的, 另一用户在跑大模型占了两块卡。
+# 本模型只需 ~1GB, 固定在 0 号卡上, 避免和对方抢。
+Environment=CUDA_VISIBLE_DEVICES=0
+
+ExecStart=%h/sched-lora/llama/llama-b11109/llama-server \
+    -m %h/sched-lora/gguf-work/qwen3-0.6b-sched-v4-Q8_0.gguf \
+    -ngl 99 -c 2048 --host 0.0.0.0 --port 18080 \
+    --jinja -np 1
+
+# 共享机器: 降低优先级, 不要和别人的任务抢 CPU
+Nice=10
+CPUWeight=20
+IOSchedulingClass=best-effort
+IOSchedulingPriority=6
+
+Restart=always
+RestartSec=5s
+
+StandardOutput=append:%h/sched-lora/llama-server.log
+StandardError=append:%h/sched-lora/llama-server.log
+
+[Install]
+WantedBy=default.target

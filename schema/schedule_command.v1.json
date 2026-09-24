@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local/schemas/schedule_command.v1.json",
+  "title": "ScheduleCommandEnvelope",
+  "description": "日程/备忘录/闹钟类工具调用的唯一事实源(single source of truth)。它同时被用于:(1) 约束解码语法生成 (2) LoRA 训练标签格式 (3) MCP 工具定义 (4) 执行层入参校验。任何一方都不允许单独修改字段。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["status", "commands"],
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["ok", "clarify", "reject"],
+      "description": "ok=可以直接执行; clarify=信息不足需反问; reject=与日程无关的闲聊/越界请求"
+    },
+    "commands": {
+      "type": "array",
+      "maxItems": 5,
+      "description": "status=ok 时至少 1 条; 其余情况为空数组。一条自然语言含多个日程时输出多条。",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["module", "action", "title"],
+        "properties": {
+          "module": {
+            "type": "string",
+            "enum": ["class", "exam", "meeting", "assignment", "alarm", "reminder", "memo"],
+            "description": "业务域。class=课程, exam=考试, meeting=会议/预约, assignment=作业/DDL, alarm=闹钟, reminder=提醒, memo=纯备忘"
+          },
+          "action": {
+            "type": "string",
+            "enum": ["add", "update", "delete", "query", "complete"],
+            "description": "第一阶段只实现 add; 其余为后续扩展位"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 60,
+            "description": "事项名称, 保留用户原话里的名词短语, 不做翻译/改写。例: 计算机原理"
+          },
+          "when": {
+            "type": "object",
+            "additionalProperties": false,
+            "description": "时间槽位。关键设计: 模型只做语义归一化, 绝不计算绝对日期。绝对日期由确定性解析器根据 now 计算, 保证可测试、可审计。",
+            "properties": {
+              "date_kind": {
+                "type": "string",
+                "enum": ["absolute", "offset_day", "weekday", "unspecified"],
+                "description": "absolute=用户给了日历日期; offset_day=今天/明天/后天; weekday=星期几; unspecified=未提日期"
+              },
+              "date_value": {
+                "type": "string",
+                "description": "date_kind=absolute 时为 YYYY-MM-DD; offset_day 时为 +0/+1/+2; weekday 时为 MO/TU/WE/TH/FR/SA/SU"
+              },
+              "week_ref": {
+                "type": "string",
+                "enum": ["this", "next", "none"],
+                "description": "仅在 date_kind=weekday 时有意义。\"下周二\"=next, \"这周二/周二\"=this"
+              },
+              "time": {
+                "type": "string",
+                "description": "24 小时制 HH:MM。用户只说\"上午九点\"时填 09:00 并由 period 记录歧义来源"
+              },
+              "period": {
+                "type": "string",
+                "enum": ["am", "pm", "none"],
+                "description": "歧义标记: 用户只说\"九点\"而无上午/下午时, period=none, 由执行层按用户作息规则消歧或反问"
+              },
+              "fuzzy": {
+                "type": "string",
+                "enum": ["morning", "noon", "afternoon", "evening", "night", "none"],
+                "description": "\"早上/中午/下午/晚上\"这类模糊时段, 由解析器映射到默认钟点"
+              },
+              "duration_min": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1440,
+                "description": "时长(分钟)。未提及则由 module 的默认值补齐, 模型留空"
+              }
+            }
+          },
+          "remind_before_min": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10080,
+            "description": "提前多久提醒。仅 alarm/reminder/class 常用, 未提及留空"
+          },
+          "location": { "type": "string", "maxLength": 60 },
+          "priority": { "type": "string", "enum": ["low", "normal", "high"] },
+          "notes": { "type": "string", "maxLength": 200 },
+          "target_ref": {
+            "type": "string",
+            "description": "action=update/delete/complete/query 时用于定位既有条目的关键字或 id; add 时留空"
+          }
+        }
+      }
+    },
+    "question": {
+      "type": "string",
+      "maxLength": 80,
+      "description": "status=clarify 时向用户提出的反问, 一句话, 不要罗列选项"
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "可选。用于执行层的\"低置信度必须人工确认\"闸门"
+    }
+  }
+}

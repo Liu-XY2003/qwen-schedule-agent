@@ -1,0 +1,74 @@
+# ------------------------------------------------------------------ 数据 / 隐私
+# ★ 个人日程数据 —— 绝对不能进仓库
+local/schedule.db
+local/*.db
+bridge/schedule.db
+bridge/*.db
+*.db-journal
+*.db-wal
+
+# 训练数据 (体积大, 且由 gen_dataset.py 可复现)
+data/generated/
+data/external/
+data/*.jsonl
+
+# ------------------------------------------------------------------ 模型 / 二进制
+# 走 Release 附件或 HuggingFace / ModelScope, 不进 git
+backup/
+models/
+bench/*.gguf
+bench/*.zip
+bench/llama/
+*.gguf
+*.safetensors
+*.bin
+
+# ------------------------------------------------------------------ 运行产物 / 日志
+local/*.log
+local/*.log.1
+local/.supervisor.lock
+local/*.png
+local/*.xml
+*.log
+
+# ------------------------------------------------------------------ 凭据
+.env
+.env.*
+*.pem
+*.key
+local/.env
+# 注意: 令牌通过环境变量 SCHED_TOKEN 传入, 不要写进任何文件
+
+# ------------------------------------------------------------------ 主题生成物
+# 这两个是 theme/gen_theme.py 的产物, 但**要提交** —— 否则新克隆的人
+# 不跑生成器就没有样式。所以这里刻意不忽略, 只用 CI 校验它们没漂移。
+# bridge/static/theme.css
+# (安卓的 Tokens.kt 在另一个仓库)
+
+# ------------------------------------------------------------------ 本机环境
+local/local.properties
+*.local
+.vscode/
+.idea/
+*.swp
+*~
+Thumbs.db
+desktop.ini
+
+# ------------------------------------------------------------------ Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ------------------------------------------------------------------ 本地归档
+# 开源整理时移到这里的旧脚本 —— 保留在本机, 但不进仓库
+_archive/
+
+# ------------------------------------------------------------------ 其他
+*.tmp
+*.bak

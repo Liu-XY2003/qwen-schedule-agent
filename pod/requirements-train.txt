@@ -1,0 +1,28 @@
+# 训练依赖 —— 只在需要重新微调时安装。
+#
+# 这些包体积很大 (torch 单独就 2-3GB), 所以**不放进 bridge/requirements.txt**,
+# 免得只想跑推理的人被迫下载。
+#
+# 装法 (建议用独立虚拟环境):
+#   python -m venv .venv && . .venv/bin/activate
+#   pip install -r pod/requirements-train.txt
+#
+# ⚠️ 版本没有精确 pin 到补丁号。训练本身对版本不敏感, 但有两点是硬要求:
+#   1. torch 需要 CUDA 版 (默认 pip 源装的是 CPU 版, 训练会慢到不可用)
+#   2. 显存吃紧时用 `--batch 4 --accum 4`; 8 会 OOM
+#      原因: logits 张量是 batch × seq × vocab = 8×270×151936×4B ≈ 1.3GB
+#      详见 docs/training-hardware-reality.md
+
+torch>=2.1
+transformers>=4.44
+peft>=0.11
+trl>=0.9
+datasets>=2.19
+accelerate>=0.30
+sentencepiece>=0.2
+
+# 导出 GGUF 用
+gguf>=0.9
+
+# 数据集生成时校验标签
+jsonschema>=4.20

@@ -1,0 +1,32 @@
+# 统一换行符, 避免 Windows/Linux 协作时整文件 diff
+* text=auto eol=lf
+
+# ⚠️ PowerShell 脚本必须是 CRLF + UTF-8 BOM。
+#    计划任务用 Windows PowerShell 5.1 执行, 它读无 BOM 的文件时会按 GBK 解码,
+#    脚本里的中文字符串会直接把解析搞崩 (踩过一次: 守候进程启动即静默退出)。
+#    git 不会自动加 BOM, 所以靠 CI 里的 check_bom 步骤守住。
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.sh  text eol=lf
+
+# 二进制 —— 不让 git 碰
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.webp binary
+*.gguf binary
+*.safetensors binary
+*.db   binary
+*.zip  binary
+*.gz   binary
+*.apk  binary
+*.jar  binary
+*.exe  binary
+*.dll  binary
+
+# 语言统计: 让 GitHub 不要把生成物算进主语言
+bridge/static/theme.css linguist-generated=true
+docs/screenshots/*.png  linguist-vendored

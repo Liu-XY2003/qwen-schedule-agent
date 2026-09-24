@@ -1,0 +1,126 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  # ---------------------------------------------------------------- 静态检查
+  hygiene:
+    name: 仓库卫生 (BOM / 敏感信息 / 主题漂移)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 所有 .ps1 必须带 UTF-8 BOM
+        run: |
+          # PowerShell 5.1 读无 BOM 的 UTF-8 文件会按 GBK 解析, 中文字符串直接崩。
+          # 这个坑很隐蔽 —— 脚本在 pwsh 7 下测试是好的, 一到计划任务就静默退出。
+          fail=0
+          while IFS= read -r f; do
+            head -c3 "$f" | od -An -tx1 | grep -q 'ef bb bf' || { echo "缺少 BOM: $f"; fail=1; }
+          done < <(find . -name '*.ps1' -not -path './.git/*')
+          exit $fail
+
+      - name: 主题生成物与 tokens.json 一致
+        run: python theme/gen_theme.py --check
+
+      - name: 敏感信息审计
+        shell: pwsh
+        run: ./scripts/audit_secrets.ps1
+
+  # ---------------------------------------------------------------- 单元测试
+  test:
+    name: 单元测试 (不需要模型)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 安装依赖
+        run: pip install -r bridge/requirements.txt
+
+      - name: 日期解析 (确定性的, 不依赖模型)
+        working-directory: bridge
+        run: python test_date_parsing.py
+
+      - name: 周/月偏移
+        working-directory: bridge
+        run: python test_offsets.py
+
+      - name: 契约无漂移 (Pydantic 镜像 vs JSON Schema)
+        working-directory: bridge
+        run: python schema_models.py ../schema/schedule_command.v2.json
+
+      - name: 主题一致性 (两端 + CSS 变量)
+        working-directory: bridge
+        run: python test_theme_consistency.py
+
+  # ---------------------------------------------------------------- 访问控制
+  auth:
+    name: 访问控制 (起真实服务)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 安装依赖
+        run: pip install -r bridge/requirements.txt
+
+      - name: 令牌门禁 12 项
+        working-directory: bridge
+        # test_auth.py 自己起两个临时实例 (不带令牌 / 带令牌), 不需要推理后端
+        run: python test_auth.py
+
+  # ---------------------------------------------------------------- 数据集
+  dataset:
+    name: 数据集符合 schema
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 安装依赖
+        run: pip install jsonschema
+
+      - name: 生成一小批数据并校验 100% 合规
+        run: |
+          # 数据集有 4000+ 条, 全量生成太慢; CI 只跑一个可复现的子集,
+          # 断言"生成器产出的标签 100% 符合 schema"这个性质本身。
+          python pod/gen_dataset.py --train 150 --test 50 --outdir /tmp/ci-data
+          python - <<'PY'
+          import json, glob, sys
+          from jsonschema import Draft202012Validator
+          schema = json.load(open("schema/schedule_command.v2.json", encoding="utf-8"))
+          v = Draft202012Validator(schema)
+          bad = tot = 0
+          for path in sorted(glob.glob("/tmp/ci-data/*")):
+              for line in open(path, encoding="utf-8"):
+                  if not line.strip():
+                      continue
+                  ex = json.loads(line)
+                  content = [m for m in ex["messages"] if m["role"] == "assistant"][-1]["content"]
+                  errs = list(v.iter_errors(json.loads(content)))
+                  tot += 1
+                  if errs:
+                      bad += 1
+                      if bad <= 3:
+                          print("不合规:", errs[0].message)
+          print(f"校验 {tot} 条, 不合规 {bad} 条")
+          sys.exit(1 if bad else 0)
+          PY

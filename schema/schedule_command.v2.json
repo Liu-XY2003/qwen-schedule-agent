@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local/schemas/schedule_command.v2.json",
+  "title": "ScheduleCommandEnvelope",
+  "description": "日程/备忘录/闹钟类工具调用的唯一事实源(single source of truth)。同时用于:(1) 约束解码语法生成 (2) LoRA 训练标签格式 (3) MCP 工具定义 (4) 执行层入参校验。任何一方都不允许单独修改字段。v2 相对 v1: week_ref 枚举 -> week_offset 数值(支持下下周/下下下周/上周); 新增 month_day + month_offset(支持下个月3号)。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["status", "commands"],
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["ok", "clarify", "reject"],
+      "description": "ok=可以直接执行; clarify=信息不足需反问; reject=与日程无关的闲聊/越界请求"
+    },
+    "commands": {
+      "type": "array",
+      "maxItems": 5,
+      "description": "status=ok 时至少 1 条; 其余情况为空数组。一条自然语言含多个日程时输出多条。",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["module", "action", "title"],
+        "properties": {
+          "module": {
+            "type": "string",
+            "enum": ["class", "exam", "meeting", "assignment", "alarm", "reminder", "memo"]
+          },
+          "action": {
+            "type": "string",
+            "enum": ["add", "update", "delete", "query", "complete"]
+          },
+          "title": { "type": "string", "maxLength": 60 },
+          "when": {
+            "type": "object",
+            "additionalProperties": false,
+            "description": "时间槽位。模型只做语义归一化, 绝不计算绝对日期。",
+            "properties": {
+              "date_kind": {
+                "type": "string",
+                "enum": ["absolute", "offset_day", "weekday", "month_day", "unspecified"],
+                "description": "absolute=给了日历日期(可含年份); offset_day=今天/明天/后天; weekday=星期几; month_day=只给几号(可带月份偏移); unspecified=未提日期"
+              },
+              "date_value": {
+                "type": "string",
+                "description": "date_kind=absolute 时: 有年份用 YYYY-MM-DD, 无年份用 MM-DD; offset_day: +0/+1/+2/+3; weekday: MO/TU/WE/TH/FR/SA/SU; month_day: 几号(1-31 的数字)"
+              },
+              "week_offset": {
+                "type": "integer",
+                "minimum": -2,
+                "maximum": 4,
+                "description": "仅 date_kind=weekday 有意义。0=本周(或不带修饰的\"周二\"), 1=下周, 2=下下周, 3=下下下周, -1=上周。缺省视为 0。"
+              },
+              "month_offset": {
+                "type": "integer",
+                "minimum": -2,
+                "maximum": 4,
+                "description": "仅 date_kind=month_day 有意义。0=这个月(或不带修饰的\"3号\"), 1=下个月, 2=下下个月, -1=上个月。缺省视为 0。"
+              },
+              "time": {
+                "type": "string",
+                "description": "24 小时制 HH:MM。用户只说\"上午九点\"时填 09:00 并由 period 记录歧义来源"
+              },
+              "period": {
+                "type": "string",
+                "enum": ["am", "pm", "none"],
+                "description": "用户只说\"九点\"而无上午/下午时填 none, 由执行层按用户作息规则消歧"
+              },
+              "fuzzy": {
+                "type": "string",
+                "enum": ["morning", "noon", "afternoon", "evening", "night", "none"],
+                "description": "\"早上/中午/下午/晚上\"这类模糊时段"
+              },
+              "duration_min": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1440
+              }
+            }
+          },
+          "remind_before_min": { "type": "integer", "minimum": 0, "maximum": 10080 },
+          "location": { "type": "string", "maxLength": 60 },
+          "priority": { "type": "string", "enum": ["low", "normal", "high"] },
+          "notes": { "type": "string", "maxLength": 200 },
+          "target_ref": { "type": "string" }
+        }
+      }
+    },
+    "question": { "type": "string", "maxLength": 80 },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+  }
+}

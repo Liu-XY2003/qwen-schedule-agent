@@ -1,0 +1,30 @@
+[Unit]
+Description=日程助手 · Web 应用 (FastAPI + 可视化月历)
+Documentation=file:%h/sched-lora/BACKUP-README.md
+After=sched-llama.service
+Wants=sched-llama.service
+PartOf=sched-llama.service
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+WorkingDirectory=%h/sched-lora
+
+# App 通过 HTTP 调用 llama-server, 进程内不再加载 torch
+Environment=SCHED_LLAMA_URL=http://127.0.0.1:18080
+Environment=PYTHONUNBUFFERED=1
+
+ExecStart=%h/ft-env/bin/python -m uvicorn app:app --host 0.0.0.0 --port 8800
+
+Nice=10
+CPUWeight=20
+
+Restart=always
+RestartSec=3s
+
+StandardOutput=append:%h/sched-lora/app.log
+StandardError=append:%h/sched-lora/app.log
+
+[Install]
+WantedBy=default.target
