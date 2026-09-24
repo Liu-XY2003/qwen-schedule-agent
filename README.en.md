@@ -1,5 +1,9 @@
 # Local Schedule Assistant
 
+[![CI](https://github.com/Liu-XY2003/qwen-schedule-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/Liu-XY2003/qwen-schedule-agent/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/Liu-XY2003/qwen-schedule-agent)](https://github.com/Liu-XY2003/qwen-schedule-agent/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 **One Chinese sentence in, a structured tool call out, a real calendar on screen. All of it runs on your own machine.**
 
 [中文](README.md) · [Architecture](#architecture) · [Quick start](#quick-start) · [Design tradeoffs](#design-tradeoffs-every-one-of-them-earned-the-hard-way)

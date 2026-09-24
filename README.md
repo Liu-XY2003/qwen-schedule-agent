@@ -1,5 +1,9 @@
 # 本地日程助手
 
+[![CI](https://github.com/Liu-XY2003/qwen-schedule-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/Liu-XY2003/qwen-schedule-agent/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/Liu-XY2003/qwen-schedule-agent)](https://github.com/Liu-XY2003/qwen-schedule-agent/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 **中文一句话 → 结构化工具调用 → 可视化日历。全部在你自己的机器上跑完。**
 
 [English](README.en.md) · [架构](#架构) · [快速开始](#快速开始) · [设计取舍](#几个关键设计取舍都是踩坑换来的)
