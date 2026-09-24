@@ -251,7 +251,7 @@ With a token set, every `/api/*` request must carry an `X-Sched-Token` header. T
 for it on a 401; the Android app has a field for it in Settings. With no token set, behaviour is
 identical to before — zero friction for local development.
 
-Android client: **[AI-ScheduleAssistant](https://github.com/liuxinyang/AI-ScheduleAssistant)**.
+Android client: **[AI-ScheduleAssistant](https://github.com/Liu-XY2003/AI-ScheduleAssistant)**.
 
 ---
 

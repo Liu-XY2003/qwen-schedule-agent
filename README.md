@@ -239,7 +239,7 @@ uvicorn app:app --app-dir bridge --host 0.0.0.0 --port 8800
 设了令牌之后所有 `/api/*` 都要带 `X-Sched-Token` 请求头。网页端遇到 401 会提示输入，
 安卓端在设置页填。不设令牌时行为与之前完全一致（本机开发零门槛）。
 
-安卓客户端见 **[AI-ScheduleAssistant](https://github.com/liuxinyang/AI-ScheduleAssistant)**。
+安卓客户端见 **[AI-ScheduleAssistant](https://github.com/Liu-XY2003/AI-ScheduleAssistant)**。
 
 ---
 

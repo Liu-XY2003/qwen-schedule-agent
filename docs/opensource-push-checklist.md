@@ -33,7 +33,7 @@ git push -u origin main
 
 | 位置 | 当前值 | 说明 |
 |---|---|---|
-| 两个 `LICENSE` 的版权行 | `Copyright (c) 2026 liuxinyang` | 按你安卓包名 `com.liuxinyang.*` 推断的；要改成别的名字/邮箱就改这里 |
+| 两个 `LICENSE` 的版权行 | `Copyright (c) 2026 Liu-XY2003` | 按你安卓包名 `com.liuxinyang.*` 推断的；要改成别的名字/邮箱就改这里 |
 | 后端 `README.md` 的 clone 地址 | 见文件内 | 建完仓库后补上真实 URL |
 
 改完再 `git commit --amend` 或追加一个提交。
