@@ -33,12 +33,18 @@ $skipDirs = @('.git', 'node_modules', '.gradle', 'build', '.idea', '.dsh', '.kot
               'backup', 'bench', 'models', 'venv', '.venv', '__pycache__',
               '.pytest_cache', 'screenshots',
               # 已 gitignore 的数据目录: 公开数据集下载物 + 生成的数据集
-              'external', 'generated')
+              'external', 'generated',
+              # Release 资产暂存 (GGUF/APK 走 Release 不进 git) + 开源整理归档
+              '_release', '_archive')
 
 # 白名单: 命中这些的行不算问题 (公开的通用值, 不是你的私有信息)
 $allowPatterns = @(
     '10\.42\.0\.0/16',        # Kubernetes 默认 Pod CIDR, 到处都是
-    'audit_secrets\.ps1'      # 审计脚本自己的规则表里必然含这些关键词
+    'audit_secrets\.ps1',     # 审计脚本自己的规则表里必然含这些关键词
+    # 文档里惯用的示例地址 (等同 example.com)。README 和推送清单里会写
+    # "把 192.168.1.20 换成你电脑的 IP", 这句说明本身会被误报成泄漏。
+    '192\.168\.1\.20',
+    '100\.100\.100\.100'
 )
 $skipExt  = @('.png','.jpg','.jpeg','.gif','.webp','.ico','.gguf','.bin','.safetensors',
               '.db','.zip','.gz','.tar','.apk','.jar','.exe','.dll','.so','.pyc',
