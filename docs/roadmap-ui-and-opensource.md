@@ -288,17 +288,24 @@ qwen-schedule-agent/
 | 源码去重 | `local/` 里的 `app.py`/`executor.py`/`schema_models.py` 副本已删除，改 `--app-dir` 跑 `bridge/` 源码 |
 | 契约路径自解析 | `app.py` 能自己找到 `schema/schedule_command.v2.json`（新克隆即可跑） |
 | 验收脚本加闸 | `acceptance_v2.py` 检测到目标库非空会拒绝运行（退出码 2），不再污染真实日历 |
-| 回归测试 | 21/21（临时库）、12/12 鉴权、10/10 主题一致性 |
+| 安全审计 | `scripts/audit_secrets.ps1`：私有 IP / 本机路径 / 邮箱 / 密钥 / 大文件 / BOM，**HIGH 归零** |
+| 脱敏 | 20 处 Tailscale IP、WLAN IP、pod 主机名 → 占位符或环境变量；删掉 3 个泄露个人配置的脚本 |
+| 仓库整理 | 179 → 75 文件；30 项运行产物删除，60 个被取代的脚本移到 `_archive/`（已 gitignore，本机保留） |
+| LICENSE | MIT × 2 仓 |
+| .gitignore / .gitattributes | 双仓；含"`.ps1` 必须 CRLF"和二进制规则 |
+| CI | 双仓 GitHub Actions：BOM 检查 / 敏感信息审计 / 主题漂移 / 单元测试 / 数据集 schema / APK 构建 |
+| 首次提交 | 双仓已 `git init` + commit，可直接 push（见 `docs/opensource-push-checklist.md`） |
+| 回归测试 | 21/21（临时库）、13/13、18/18、12/12 鉴权、10/10 主题一致性 |
 
-## 🚧 待办（按顺序）
+## 🚧 待办
 
 ```
-1. 安全审计 + 清理敏感文件          ← 下一步，必须先做
-2. LICENSE (MIT) × 2 仓
-3. .gitignore × 2 仓 + .gitattributes（锁 CRLF/LF）
-4. 把 .ps1 的 BOM 固化进 CI（无 BOM 会被 PowerShell 5.1 当 GBK 读崩）
-5. 写 README（中英）+ 架构图 + 演示 GIF
-6. 建仓库、首次提交、发 Release（LoRA + GGUF + APK）
+1. 在 GitHub 建两个空仓库并 push        ← 步骤见 docs/opensource-push-checklist.md
+2. 确认 LICENSE 版权人（当前按包名推断为 liuxinyang）
+3. 写中英双语 README + 架构图           ← 门面，决定别人会不会用
+4. 录演示 GIF（截图已有 7 张，在 docs/screenshots/）
+5. 发 Release：LoRA adapter + GGUF + APK
+6. 补应用图标 / 启动图
 ```
 
 ## ⚠️ 本轮新发现的坑（开源前必须处理）
@@ -308,12 +315,21 @@ qwen-schedule-agent/
    `supervise.ps1` 启动即静默退出）。仓库里要么加 `.gitattributes` 强制，
    要么在 CI 里断言每个 `.ps1` 都有 BOM。
 
-2. **`local/` 与 `bridge/` 的源码副本已经分叉过一次。** 已合并，但历史上
-   `fix_and_verify_race.ps1` 这类"拷来拷去"的一次性脚本还留在仓库里，
-   且含真实主机名 —— 开源前删除或模板化。
+2. **`local/` 与 `bridge/` 的源码副本已经分叉过一次。** 已合并成单一源码，
+   `fix_and_verify_race.ps1` / `check_sync.ps1` 这类"拷来拷去"的脚本已归档。
 
-3. **验收脚本写真实数据。** `acceptance_v2.py` 会真调 `/api/chat`，
-   已加非空库拦截。文档里要提醒使用者用临时库。
+3. **批量替换 `fetch(` → `api(` 把 `api()` 函数自己内部那句也换了**，造成无限递归 ——
+   所有请求挂死，页面显示"无法连接服务"。**静态语法检查查不出来**（递归语法合法），
+   是把页面真的渲染出来截图才发现的。教训：UI 交付物必须真渲染一次看。
 
-4. **Windows 控制台的 GBK 会打崩含 emoji 的输出。** 脚本里应
-   `sys.stdout.reconfigure(encoding="utf-8", errors="replace")`。
+4. **验收脚本写真实数据。** 21 条用例把 6 条日程冲到 23 条，已加非空库拦截 +
+   `local/run_acceptance_scratch.ps1` 走临时库。
+
+5. **Windows 控制台 GBK 会把含 emoji 的输出打崩。** 5 个脚本受影响
+   （`schema_models.py` 连测试结论都打不出来），统一用 `bridge/_console.py` 兜底。
+
+6. **`Get-ChildItem -Recurse` 再过滤会超时。** `backup/` 1GB + `bench/llama` 整套构建产物，
+   审计脚本必须在遍历时就剪枝。
+
+7. **`Add-Content -Encoding UTF8` 会在文件中间插 BOM**（PS 5.1）。
+   往已有文本文件追加内容要用 Python 或 `-Encoding utf8NoBOM`。
