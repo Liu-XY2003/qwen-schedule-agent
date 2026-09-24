@@ -70,6 +70,11 @@ $rules = @(
     @{ N='私有 Tailscale / 内网 IP'; S='HIGH'
        R='\b(100\.(6[4-9]|[7-9]\d|1[0-2]\d)\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3})\b'
        D='暴露你的私有网络拓扑, 改成占位符 100.x.y.z / 192.168.x.x' }
+    # ★ 公网 IP 比内网 IP 更容易漏 —— 它长得不像"隐私", 但直接把服务器暴露给全网。
+    #   实测就在 README 里漏过一次 (180.201.177.206)。
+    @{ N='公网 IPv4 地址'; S='HIGH'
+       R='\b(?!10\.|127\.|0\.|255\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.|100\.(6[4-9]|[7-9][0-9]|1[0-2][0-9])\.)(([1-9][0-9]?|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\.){3}([1-9][0-9]?|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\b'
+       D='暴露服务器公网地址, 改成 <your-host> 或从环境变量读' }
     @{ N='本机 Windows 绝对路径'; S='MED'
        R='[A-Za-z]:\\\\?(Users|Projects|sdk)\\\\'
        D='暴露本机用户名和目录结构, 改成相对路径或环境变量' }
@@ -152,10 +157,13 @@ foreach ($g in $byCat) {
     Write-Host ""
 }
 
-$high = ($sorted | Where-Object Severity -eq 'HIGH').Count
-$med  = ($sorted | Where-Object Severity -eq 'MED').Count
-Write-Host ("合计 {0} 处:  HIGH={1}  MED={2}" -f $sorted.Count, $high, $med)
-if ($high -gt 0) {
+# ★ 用 @() 包住再取 .Count。
+#   直接 (...).Count 在结果恰好为 1 个对象时, PowerShell 5.1 会给出空值 ——
+#   表现就是"明明有 1 处 HIGH, 却报告 HIGH= 且退出码 0", CI 会直接放行。
+$highCount = @($sorted | Where-Object { $_.Severity -eq 'HIGH' }).Count
+$medCount  = @($sorted | Where-Object { $_.Severity -eq 'MED' }).Count
+Write-Host ("合计 {0} 处:  HIGH={1}  MED={2}" -f @($sorted).Count, $highCount, $medCount)
+if ($highCount -gt 0) {
     Write-Host "存在 HIGH 项, 开源前必须处理。" -ForegroundColor Red
     exit 1
 }

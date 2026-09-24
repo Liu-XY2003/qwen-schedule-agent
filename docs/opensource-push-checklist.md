@@ -16,13 +16,13 @@
 ```powershell
 # ---- 后端 ----
 cd D:\Projects\qwen-local-tool-agent
-git remote add origin https://github.com/<你的用户名>/qwen-schedule-agent.git
+git remote add origin https://github.com/Liu-XY2003/qwen-schedule-agent.git
 git branch -M main
 git push -u origin main
 
 # ---- 安卓 ----
 cd D:\Projects\AI_ScheduleAssistant
-git remote add origin https://github.com/<你的用户名>/AI-ScheduleAssistant.git
+git remote add origin https://github.com/Liu-XY2003/AI-ScheduleAssistant.git
 git branch -M main
 git push -u origin main
 ```
@@ -66,11 +66,29 @@ git push -u origin main
 
 > CI 里跑的就是本地跑过的同一批命令，已经逐条验证过，不是摆设。
 
-## 6. 已知的、故意保留的东西
+## 6. README 与截图
+
+两份仓库都有中英双语 README，顶部互相链接：
+
+| 仓库 | 中文 | 英文 |
+|---|---|---|
+| `qwen-schedule-agent` | `README.md` | `README.en.md` |
+| `AI-ScheduleAssistant` | `README.md` | `README.en.md` |
+
+架构图用的是 **Mermaid**（GitHub 原生渲染，不需要额外的图片文件，改起来就是改文本）。
+全部 10 张图都用 `mermaid-cli` 实际渲染验证过语法 —— 语法错的话 GitHub 上会显示成
+一坨源码，光看 Markdown 是发现不了的。
+
+截图在 `docs/screenshots/`（后端仓 7 张，安卓仓 5 张），都是从模拟器
+`adb shell screencap` 抓的真实画面，可直接用在 README 或 Release 说明里。
+
+## 7. 已知的、故意保留的东西
 
 - `docs/PROJECT-STATE.md` 等文档里有 `ssh <your-host>` 这种占位符 —— 原来的真实主机名
-  已经在开源清理时替换掉了，文档本身保留（它们是项目最有价值的部分之一）。
-- `_archive/` 目录（已 gitignore）里放着 60 个被取代的一次性脚本，只在你本机，
-  不会进仓库。确认不再需要可以删掉。
+  已在开源清理时替换。文档本身保留（它们是项目最有价值的部分之一）。
+- `_archive/` 目录（已 gitignore）里放着 60 个被取代的一次性脚本，只在你本机，不会进仓库。
+  确认不再需要可以删掉。
 - `docs/` 里提到 `CompShare`（优云智算）—— 那是公开的 GPU 云厂商名，等同提 AWS，
-  不构成隐私问题。
+  不构成隐私问题。审计脚本会把它列为 MED，可忽略。
+- `AI-ScheduleAssistant` 里的 `192.168.1.20` / `100.100.100.100` 是占位符，不是真实地址，
+  CI 对它们做了白名单。
