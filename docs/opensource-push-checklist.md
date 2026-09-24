@@ -92,3 +92,84 @@ git push -u origin main
   不构成隐私问题。审计脚本会把它列为 MED，可忽略。
 - `AI-ScheduleAssistant` 里的 `192.168.1.20` / `100.100.100.100` 是占位符，不是真实地址，
   CI 对它们做了白名单。
+
+---
+
+# v0.1.0 发布记录（已完成）
+
+| 项 | 状态 |
+|---|---|
+| 两个仓库 push | ✅ `github.com/Liu-XY2003/{qwen-schedule-agent, AI-ScheduleAssistant}` |
+| tag `v0.1.0` | ✅ 两个仓库都已打并推送 |
+| Release（后端） | ✅ 4 个资产 / 1025.8 MB |
+| Release（安卓） | ✅ 2 个资产 / 18.4 MB |
+| 资产校验 | ✅ 6/6 SHA256 与 GitHub 服务端 digest 一致 |
+| 公开可访问 | ✅ Release 页面与资产直链均 200（不带凭据） |
+
+用户名为 **Liu-XY2003**。README / LICENSE 里原先写的 `liuxinyang` 是按安卓包名猜的，
+已全部改正 —— 安卓包名 `com.liuxinyang.*` 保持不变，那是应用标识，与 GitHub 账号无关。
+
+安卓 APK 目前是 **debug 包**（`android:debuggable=true`，调试密钥签名）。
+Release 说明里已写明风险。将来转正式签名时，已安装的用户必须先卸载。
+
+---
+
+# 下次发版怎么做
+
+## 1. 前置（只需一次）
+
+```powershell
+winget install --id GitHub.cli
+gh auth login          # GitHub.com -> HTTPS -> 浏览器登录
+```
+
+需要 `repo` scope —— `gh auth status` 里能看到。
+
+## 2. 提交改动并重新构建
+
+```powershell
+cd D:\Projects\qwen-local-tool-agent;  git add -A; git commit -m "..."; git push
+cd D:\Projects\AI_ScheduleAssistant;   git add -A; git commit -m "..."; git push
+
+# 重新出 APK（需要 JDK 17）
+cd D:\Projects\AI_ScheduleAssistant
+$env:JAVA_HOME = 'C:\Program Files\Java\jdk-17'
+.\gradlew.bat assembleDebug
+```
+
+## 3. 准备资产
+
+放到各自的暂存目录（都已 gitignore）：
+
+- `qwen-local-tool-agent\_release\backend\` —— GGUF、LoRA adapter、`SHA256SUMS.txt`
+- `AI_ScheduleAssistant\_release\` —— APK、`SHA256SUMS.txt`
+
+`SHA256SUMS.txt` 格式：`<sha256>  <文件名>`（两个空格）。
+
+## 4. 写说明并发布
+
+新建 `release-notes\v0.2.0.md`（两份仓库各一份），然后：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File local\publish_release.ps1 -Version v0.2.0 -DryRun
+powershell -ExecutionPolicy Bypass -File local\publish_release.ps1 -Version v0.2.0
+```
+
+脚本流程：检查 gh → 检查资产 → 打 tag 并推送 → 建 Release 并上传。
+
+## 5. 校验（别跳过）
+
+```powershell
+python scripts\verify_release.py v0.2.0
+```
+
+它用 GitHub API 拿远端资产，逐个比对大小和 **SHA256** —— GitHub 为较新的资产提供
+服务端算的 `digest`，所以**不用下载 1GB 就能验**。
+
+**这一步不能省。** `gh release create` 传完后的退出码不一定反映单个资产是否完整，
+而 Release 页面上少一个 600MB 的文件极容易被忽略。
+
+> ⚠️ 编辑 `.ps1` 之后务必确认文件**带 UTF-8 BOM**。
+> 很多编辑器/工具默认存成无 BOM 的 UTF-8，而 Windows PowerShell 5.1 会按 GBK 解析，
+> 中文字符串直接把脚本解析崩掉（本项目已经踩过两次）。CI 里有断言守着；
+> 手动补：`python -c "import pathlib;p=pathlib.Path('x.ps1');p.write_bytes(b'\xef\xbb\xbf'+p.read_bytes())"`

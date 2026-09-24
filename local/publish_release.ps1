@@ -30,9 +30,25 @@ $Android = 'D:\Projects\AI_ScheduleAssistant'
 $Stage   = "$Backend\_release"
 
 # ---------------------------------------------------------------- 前置检查
+
+# ★ winget 装完 gh 后, 当前会话的 PATH 不会刷新 (机器 PATH 更新了, 已启动的进程看不到)。
+#   所以不能只靠 Get-Command, 要主动探测标准安装位置。
+function Resolve-Gh {
+    $fromPath = Get-Command gh -ErrorAction SilentlyContinue
+    if ($fromPath) { return $fromPath.Source }
+    $cands = @(
+        "$env:ProgramFiles\GitHub CLI\gh.exe",
+        "${env:ProgramFiles(x86)}\GitHub CLI\gh.exe",
+        "$env:LOCALAPPDATA\Programs\GitHub CLI\gh.exe",
+        "$env:ProgramFiles\GitHub CLI\bin\gh.exe"
+    )
+    foreach ($c in $cands) { if (Test-Path $c) { return $c } }
+    return $null
+}
+
 Write-Host "=== 1. 检查 gh ===" -ForegroundColor Cyan
-$gh = Get-Command gh -ErrorAction SilentlyContinue
-if (-not $gh) {
+$ghPath = Resolve-Gh
+if (-not $ghPath) {
     Write-Host @"
 gh 未安装。二选一:
 
@@ -55,13 +71,14 @@ gh 未安装。二选一:
     exit 1
 }
 
-$auth = & gh auth status 2>&1
+$auth = & $ghPath auth status 2>&1
 if ($LASTEXITCODE -ne 0) {
     Write-Host "gh 未登录。跑一次: gh auth login" -ForegroundColor Yellow
     Write-Host $auth
     exit 1
 }
-Write-Host "  gh 就绪" -ForegroundColor Green
+$who = (& $ghPath api user --jq .login 2>&1)
+Write-Host "  gh 就绪，登录身份: $who" -ForegroundColor Green
 
 # ---------------------------------------------------------------- 资产检查
 Write-Host "`n=== 2. 检查资产 ===" -ForegroundColor Cyan
@@ -98,19 +115,23 @@ Write-Host "`n=== 4. 创建 Release 并上传资产 ===" -ForegroundColor Cyan
 Write-Host "  后端约 1026 MB, 上传需要几分钟, 请勿中断" -ForegroundColor Yellow
 
 Push-Location $Backend
-& gh release create $Version `
+# ★ 必须自己展开通配符: gh 不做 glob, PowerShell 对原生程序也不展开,
+#   直接传 "$Stage\backend\*" 会被当成一个字面文件名而报错。
+$backendAssets = @(Get-ChildItem "$Stage\backend" -File | ForEach-Object { $_.FullName })
+& $ghPath release create $Version `
     --repo 'Liu-XY2003/qwen-schedule-agent' `
     --title "$Version — 首次发布" `
     --notes-file "$Backend\release-notes\$Version.md" `
-    ($Stage + '\backend\*')
+    @backendAssets
 Pop-Location
 
 Push-Location $Android
-& gh release create $Version `
+$androidAssets = @(Get-ChildItem "$Stage\android" -File | ForEach-Object { $_.FullName })
+& $ghPath release create $Version `
     --repo 'Liu-XY2003/AI-ScheduleAssistant' `
     --title "$Version — 首次发布" `
     --notes-file "$Android\release-notes\$Version.md" `
-    ($Stage + '\android\*')
+    @androidAssets
 Pop-Location
 
 Write-Host "`n=== 完成 ===" -ForegroundColor Green
