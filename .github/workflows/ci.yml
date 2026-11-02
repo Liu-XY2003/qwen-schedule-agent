@@ -95,6 +95,10 @@ jobs:
         working-directory: bridge
         run: python test_planning_dates.py
 
+      - name: 确定性规则层（时长/日期/约束的兜底抽取）
+        working-directory: bridge
+        run: python test_rules.py
+
       - name: 演示跑一遍（确认能出计划）
         working-directory: bridge
         run: python planner.py

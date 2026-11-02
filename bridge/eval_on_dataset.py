@@ -104,12 +104,11 @@ def deadline_eq(a, b) -> bool:
     return da == db
 
 
-def eval_one(text, gold, fewshot):
+def eval_one(text, gold, fewshot, use_rules=True):
     try:
-        pred = planning.extract(text, fewshot=fewshot)
+        return planning.extract(text, fewshot=fewshot, use_rules=use_rules)
     except Exception:
         return None
-    return pred
 
 
 def main() -> int:
@@ -123,6 +122,8 @@ def main() -> int:
     g.add_argument("--fewshot", dest="fewshot", action="store_const", const="lite")
     g.add_argument("--fewshot-rich", dest="fewshot", action="store_const", const="rich")
     g.add_argument("--zero-shot", dest="fewshot", action="store_const", const=False)
+    ap.add_argument("--no-rules", dest="use_rules", action="store_false", default=True,
+                    help="关闭确定性规则层, 只测模型本身")
     ap.set_defaults(fewshot="rich")
     a = ap.parse_args()
 
@@ -135,7 +136,8 @@ def main() -> int:
 
     mode = {False: "零样本", "lite": "few-shot×2", "rich": "few-shot×5"}[a.fewshot]
     print(f"\n{'='*76}")
-    print(f"数据集评估: {a.label or a.data}  [{mode}]  {len(rows)} 条")
+    rules_txt = "规则层开" if a.use_rules else "规则层关"
+    print(f"数据集评估: {a.label or a.data}  [{mode} / {rules_txt}]  {len(rows)} 条")
     print(f"{'='*76}")
 
     n = ok_status = ok_sample = 0
@@ -147,7 +149,7 @@ def main() -> int:
     for i, r in enumerate(rows, 1):
         text = r["messages"][1]["content"]
         gold = json.loads(r["messages"][2]["content"])
-        pred = eval_one(text, gold, a.fewshot)
+        pred = eval_one(text, gold, a.fewshot, a.use_rules)
         n += 1
         if pred is None:
             continue

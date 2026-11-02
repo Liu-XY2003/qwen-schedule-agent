@@ -72,13 +72,17 @@ def _post(payload: dict, timeout: float = 180.0) -> dict:
 
 
 def extract(text: str, *, llama_url: str | None = None,
-            max_tokens: int = 512, fewshot: str | bool = "rich") -> dict:
+            max_tokens: int = 512, fewshot: str | bool = "rich",
+            use_rules: bool = True) -> dict:
     """文本 → planning_request 信封。失败抛异常。
 
-    fewshot: False/"none" 不带示例; True/"lite" 两个; "rich" 五个(默认)。
-    实测**必须开** —— 未经微调的基座模型面对这个复杂度的新契约, 零样本几乎一律
-    输出 status=reject(1.7B 只有 14%)。示例覆盖多件事/约束/拒答/追问四类关键形态
-    后准确率明显提升(见 docs/extraction-benchmark.md)。
+    fewshot:   False/"none" 不带示例; True/"lite" 两个; "rich" 五个(默认)。
+    use_rules: 用确定性规则补齐/校正时长、日期、排期约束（默认开）。
+
+    分工: 模型负责"理解语义、判断该不该拒答、抽出有哪几件事";
+          规则负责那些高度结构化的字段。
+    实测 keep_free 交给模型只有 30.6%, 交给正则高得多 —— 见 docs/extraction-benchmark.md。
+
     微调之后应改用 fewshot=False, 让 prompt 短下来、更快。
     """
     global LLAMA_URL
@@ -105,6 +109,11 @@ def extract(text: str, *, llama_url: str | None = None,
     except Exception as e:
         raise ValueError(f"模型输出不是合法 JSON: {raw[:200]!r} ({e})")
     validate(env)
+    if use_rules and env.get("status") == "ok":
+        # 规则补齐: 只动 constraints / duration_min / deadline_*, 不改条数和标题
+        import rules
+        env = rules.augment(env, text)
+        validate(env)
     return env
 
 
