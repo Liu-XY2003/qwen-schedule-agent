@@ -24,7 +24,7 @@ Start-Sleep -Seconds 2
 Write-Host "=== 2. 启动 llama-server (Vulkan / iGPU) ===" -ForegroundColor Cyan
 $llmLog = "$Local\llama-server.log"
 $llm = Start-Process -FilePath "$Llama\llama-server.exe" `
-    -ArgumentList @('-m', $Model, '-ngl', '99', '-c', '2048',
+    -ArgumentList @('-m', $Model, '-ngl', '99', '-c', '8192',
                     '--host', '127.0.0.1', '--port', "$LLMPort",
                     '--jinja', '-np', '1',
                     # 关掉 Qwen3 思考模式: 结构化抽取用不上, 实测快 3.6 倍

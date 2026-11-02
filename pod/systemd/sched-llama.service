@@ -20,7 +20,7 @@ Environment=CUDA_VISIBLE_DEVICES=0
 
 ExecStart=%h/sched-lora/llama/llama-b11109/llama-server \
     -m %h/sched-lora/gguf-work/qwen3-0.6b-sched-v4-Q8_0.gguf \
-    -ngl 99 -c 2048 --host 0.0.0.0 --port 18080 \
+    -ngl 99 -c 8192 --host 0.0.0.0 --port 18080 \
     --jinja -np 1 \
     --reasoning off
 

@@ -335,6 +335,55 @@ def chat(body: ChatIn):
     return run_pipeline(body.text.strip())
 
 
+# ---------------------------------------------------------------- 二阶段: 规划
+@app.post("/api/plan")
+def plan_endpoint(body: ChatIn):
+    """杂乱文本 → 待办+约束 → CP-SAT 计划。
+
+    与 /api/chat 的区别:
+      /api/chat  一条命令 -> 一条日程（命令式）
+      /api/plan  一段素材 -> 一个可行周计划（规划式）
+
+    分工: 模型只做抽取(planning.extract), 排期由 planner.plan 确定性求解。
+    模型绝不算日期、绝不排时间 —— 与一阶段"模型不算日期"是同一条原则。
+    """
+    t0 = time.perf_counter()
+    try:
+        from planning import plan_from_text
+    except ImportError as e:                     # 没装 ortools 的降级
+        return JSONResponse(
+            {"error": f"规划求解器不可用（缺依赖）: {e}",
+             "hint": "pip install -r bridge/requirements-planner.txt"},
+            status_code=503)
+
+    try:
+        env, res = plan_from_text(body.text.strip(), llama_url=LLAMA_URL)
+    except Exception as e:
+        return JSONResponse({"error": f"抽取失败: {e}"}, status_code=422)
+
+    out = {"envelope": env,
+           "elapsed_ms": round((time.perf_counter() - t0) * 1000)}
+
+    if res is None:                              # clarify / reject
+        out["plan"] = None
+        out["message"] = env.get("question") or "这段文字里没有可规划的事项"
+        return out
+
+    out["plan"] = {
+        "feasible": res.feasible,
+        "objective": res.objective,
+        "solve_ms": res.solve_ms,
+        "violations": res.violations,
+        "assignments": [
+            {"task_id": a.task_id, "title": a.title,
+             "start": a.start.isoformat(), "end": a.end.isoformat(),
+             "chunk": a.chunk}
+            for a in res.assignments
+        ],
+    }
+    return out
+
+
 @app.get("/api/events")
 def events():
     rows = STORE.fetch(
@@ -501,6 +550,34 @@ pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:
 @keyframes s{to{transform:rotate(360deg)}}
 .memo-b{background:var(--card2);border-radius:8px;padding:8px 11px;font-size:13px;margin-bottom:7px}
 .memo-b .n{color:var(--muted);font-size:12px}
+
+/* ---- 二阶段: 素材 → 计划 面板 ---- */
+.planhead{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.plantitle{font-weight:650;font-size:15px;font-family:var(--font-title)}
+.planhint{font-size:12px;color:var(--muted)}
+#ptext{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:var(--r-btn);
+       color:var(--fg);padding:11px 13px;font:14px/1.6 inherit;resize:vertical;font-family:inherit}
+#ptext::placeholder{color:var(--muted);opacity:.8}
+#ptext:focus{outline:none;border-color:var(--accent)}
+#pgo{background:var(--accent);color:var(--on-accent)}
+#pgo:hover{filter:brightness(1.12)}
+#pgo:disabled{background:var(--chip-bg);color:var(--muted);cursor:not-allowed;filter:none}
+.pday{margin-bottom:14px}
+.pday h3{font-size:13px;margin:0 0 7px;color:var(--muted);font-weight:600}
+.pitem{display:flex;gap:10px;align-items:baseline;
+       background:color-mix(in srgb,var(--accent) 7%,var(--card2));
+       border-left:var(--ev-bar) solid var(--accent);
+       border-radius:8px;padding:8px 11px;margin-bottom:6px;font-size:13.5px}
+.pitem .pt{color:var(--accent);font-variant-numeric:tabular-nums;font-size:12.5px;min-width:100px}
+.pitem .pn{flex:1}
+.pitem .pc{font-size:11px;color:var(--muted)}
+.planmeta{font-size:12px;color:var(--muted);margin-bottom:10px}
+.planwarn{font-size:12.5px;color:var(--warn);
+          background:color-mix(in srgb,var(--warn) 10%,var(--card));
+          border:1px solid color-mix(in srgb,var(--warn) 30%,var(--line));
+          border-radius:8px;padding:9px 11px;margin-bottom:10px}
+.envbox{margin-top:10px;font-size:12px}
+.envbox pre{max-height:260px;overflow:auto}
 /* 新增日程后让卡片闪一下 —— 用 class 而不是内联颜色, 否则换了主题就串色 */
 .item,.memo-b{transition:background .4s ease-out}
 .flash{background:color-mix(in srgb,var(--ok) 24%,var(--card2)) !important}
@@ -523,6 +600,22 @@ pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:
   </div>
   <div class="chips" id="chips"></div>
   <div class="result" id="res"></div>
+</div>
+
+<!-- 二阶段: 素材 → 周计划。模型只做抽取, 排期由 CP-SAT 求解 -->
+<div class="addbar planner">
+  <div class="planhead">
+    <span class="plantitle">一句话说不清？直接贴一段</span>
+    <span class="planhint">把待办、截止、限制混在一起贴进来，它会先抽成约束再排成周计划</span>
+  </div>
+  <textarea id="ptext" rows="3"
+    placeholder="例如：这周有点乱，周三上午别排东西要陪家人；周五 18:00 前交实习周报，大概 40 分钟；准备下周二的组会汇报，至少两小时。"></textarea>
+  <div class="addrow" style="margin-top:9px">
+    <button id="pgo">生成计划</button>
+    <button class="ghost" id="pclr">清空</button>
+  </div>
+  <div class="result" id="pres"></div>
+  <div id="planout"></div>
 </div>
 
 <div class="layout">
@@ -808,6 +901,78 @@ async function add(){
 }
 $("#go").onclick = add;
 $("#q").addEventListener("keydown", e=>{ if(e.key==="Enter") add(); });
+
+// ---- 二阶段: 素材 → 周计划 ----
+// 模型只负责把这段文字抽成「待办 + 约束」, 排期由后端的 CP-SAT 求解器完成。
+// 所以这里只需要把 assignments 按天渲染出来, 不需要前端做任何日期计算。
+function showPlan(cls, html){
+  const r = $("#pres"); r.className = "result show " + cls; r.innerHTML = html;
+}
+
+async function makePlan(){
+  const text = $("#ptext").value.trim();
+  if(!text) return;
+  $("#pgo").disabled = true;
+  $("#pgo").innerHTML = '<span class="spin"></span> 规划中';
+  showPlan("warn", "正在抽取待办并求解…");
+  $("#planout").innerHTML = "";
+  try{
+    const r = await api("/api/plan", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({text})
+    });
+    const j = await r.json();
+    if(!r.ok){
+      showPlan("err", "规划失败：" + esc(j.error || ("HTTP " + r.status)) +
+        (j.hint ? "<br><span style='opacity:.8'>" + esc(j.hint) + "</span>" : ""));
+      return;
+    }
+    const env = j.envelope || {};
+    if(!j.plan){
+      showPlan("warn", "<b>" + esc(j.message || "没有可规划的事项") + "</b>");
+      return;
+    }
+    if(!j.plan.feasible){
+      const vs = (j.plan.violations || []).map(esc).join("<br>");
+      showPlan("err", "<b>排不出来</b>" + (vs ? "<br>" + vs : ""));
+      return;
+    }
+    const n = (j.plan.assignments || []).length;
+    showPlan("ok", "已生成 <b>" + n + "</b> 项安排 · 求解 " + j.plan.solve_ms +
+                   "ms · 整体 " + j.elapsed_ms + "ms");
+
+    const by = {};
+    for(const a of (j.plan.assignments || [])){
+      (by[a.start.slice(0,10)] = by[a.start.slice(0,10)] || []).push(a);
+    }
+    let html = "";
+    for(const d of Object.keys(by).sort()){
+      const dt = new Date(d + "T00:00:00");
+      html += '<div class="pday"><h3>' + d.slice(5,7) + " 月 " + d.slice(8,10) +
+              " 日 星期" + WD[(dt.getDay()+6)%7] + "</h3>";
+      for(const a of by[d].sort((x,y)=>x.start.localeCompare(y.start))){
+        html += '<div class="pitem"><span class="pt">' + a.start.slice(11,16) +
+                " – " + a.end.slice(11,16) + '</span><span class="pn">' +
+                esc(a.title) + "</span>" +
+                (a.chunk ? '<span class="pc">第 ' + (a.chunk+1) + " 块</span>" : "") +
+                "</div>";
+      }
+      html += "</div>";
+    }
+    html += '<details class="envbox"><summary>抽取到的约束（点开看模型到底抽了什么）</summary>' +
+            "<pre>" + esc(JSON.stringify(env, null, 2)) + "</pre></details>";
+    $("#planout").innerHTML = html;
+  }catch(e){
+    showPlan("err", "请求异常：" + esc(e));
+  }finally{
+    $("#pgo").disabled = false; $("#pgo").textContent = "生成计划";
+  }
+}
+$("#pgo").onclick = makePlan;
+$("#pclr").onclick = ()=>{
+  $("#ptext").value = ""; $("#planout").innerHTML = "";
+  $("#pres").className = "result"; $("#pres").innerHTML = "";
+};
 
 const now = new Date(); Y = now.getFullYear(); M = now.getMonth(); SEL = iso(now);
 loadEvents();

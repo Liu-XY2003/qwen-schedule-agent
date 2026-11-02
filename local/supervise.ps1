@@ -37,6 +37,16 @@ $MaxLogMB  = 4
 #     C:\msys64\ucrt64\bin\python.exe (没有 uvicorn), 导致 App 反复"启动即退出"。
 #     所以这里主动探测一个确实能 import uvicorn 的解释器。
 function Resolve-Python {
+    # 优先用项目自己的 venv: 二阶段的规划求解器需要 ortools, 而 ortools 会带进
+    # pandas/numpy, 塞进 anaconda 那种大环境容易和已有的科学计算包打架
+    # (实测: anaconda 的 numpy 2.x 让 ortools 一 import 就崩)。
+    # 所以 app 和 planner 共用仓库内的 .venv-planner, 见 bridge/requirements-planner.txt。
+    $venvPy = Join-Path $Root '.venv-planner\Scripts\python.exe'
+    if (Test-Path $venvPy) {
+        & $venvPy -c "import uvicorn, fastapi, pydantic, jsonschema, ortools" 2>$null
+        if ($LASTEXITCODE -eq 0) { return $venvPy }
+    }
+
     $cands = @(
         # 用环境变量拼, 不写死本机用户名 (仓库要公开)
         "$env:USERPROFILE\anaconda3\python.exe",
@@ -47,6 +57,7 @@ function Resolve-Python {
     foreach ($c in @('python.exe', 'python3.exe')) {
         Get-Command $c -ErrorAction SilentlyContinue | ForEach-Object { $cands += $_.Source }
     }
+    # 兜底: 没有 venv 时至少要能跑一阶段(不含规划求解器), 所以这里不要求 ortools
     foreach ($p in ($cands | Select-Object -Unique)) {
         if (-not (Test-Path $p)) { continue }
         & $p -c "import uvicorn, fastapi, pydantic, jsonschema" 2>$null
@@ -55,6 +66,8 @@ function Resolve-Python {
     return $null
 }
 $PythonExe = Resolve-Python
+# 让 app 知道用哪个解释器跑规划求解器（/api/plan 需要 ortools）
+if ($PythonExe) { $env:SCHED_PYTHON = $PythonExe }
 
 # ---------------------------------------------------------------- 日志
 function Write-Log {
@@ -119,7 +132,7 @@ function Start-Llama {
     $errLog = "$LocalDir\llama-server.err.log"
     Remove-Item $outLog, $errLog -ErrorAction SilentlyContinue
     $p = Start-Process -FilePath "$LlamaDir\llama-server.exe" `
-        -ArgumentList @('-m', $Model, '-ngl', '99', '-c', '2048',
+        -ArgumentList @('-m', $Model, '-ngl', '99', '-c', '8192',
                         '--host', '127.0.0.1', '--port', "$LlamaPort",
                         '--jinja', '-np', '1',
                         # ★ 必须关掉 Qwen3 的思考模式。

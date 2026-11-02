@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local/schemas/planning_request.v1.json",
+  "title": "PlanningRequestEnvelope",
+  "description": "二阶段契约: 把一段**非结构化的日程素材**(聊天记录/邮件片段/多条待办/一句抱怨)抽取成规划求解器(CP-SAT)能吃的约束。与 schedule_command.v2 的关系: 那个是「一条命令」, 这个是「一批待办 + 约束」。同样是一份 Schema 同时喂给训练标签/约束解码/校验/评估。模型依然**不算绝对日期**——deadline 只写用户提到的日期表达, 由执行层解析。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["status"],
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["ok", "clarify", "reject"],
+      "description": "ok=抽到了可排的待办; clarify=信息不足以排(缺时长/缺截止且无法默认); reject=这段文字里没有可规划的事项"
+    },
+    "items": {
+      "type": "array",
+      "maxItems": 8,
+      "description": "status=ok 时至少 1 条。把素材里所有「需要占用时间去做的事」列出来。闲聊、纯信息、已完成的事不要列。",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["title", "duration_min"],
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 40,
+            "description": "简短的任务名, 从原文提炼, 不要照抄整句"
+          },
+          "duration_min": {
+            "type": "integer",
+            "minimum": 5,
+            "maximum": 600,
+            "description": "预估耗时(分钟)。原文明确说了就用原文(\"两个小时\"=120); 没说但可合理推断就用推断值(交一次作业≈60); 完全无法推断则 status=clarify"
+          },
+          "deadline_date": {
+            "type": "string",
+            "description": "截止日期的**表达形式**, 不是绝对日期。可填: 2026-11-07 / 11-07 / 周五 / 明天 / 下周三。没有截止就不填"
+          },
+          "deadline_time": {
+            "type": "string",
+            "description": "24 小时制 HH:MM。只有明确提到几点才算, 例如\"周五 23:59 前\"-> 23:59"
+          },
+          "priority": {
+            "type": "string",
+            "enum": ["low", "normal", "high"],
+            "description": "high=有硬截止或用户强调; low=可做可不做(健身/整理); 其余 normal"
+          },
+          "splittable": {
+            "type": "boolean",
+            "description": "能否切成多块做。写报告/读论文=true; 开会/上课/健身=false"
+          },
+          "preferred": {
+            "type": "string",
+            "enum": ["am", "pm", "eve", "none"],
+            "description": "用户对时段有偏好时填。没提就 none"
+          }
+        }
+      }
+    },
+    "constraints": {
+      "type": "array",
+      "maxItems": 6,
+      "description": "素材里提到的**排期限制**。只抽用户明确说了的, 不要脑补。",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "weight"],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": ["keep_free"],
+            "description": "keep_free=这段时间不要排任何事(例如\"周三上午别给我排东西\")"
+          },
+          "weight": {
+            "type": "string",
+            "enum": ["hard", "soft"],
+            "description": "hard=用户用了\"必须/绝对/不要\"; soft=用了\"尽量/最好\"或语气平淡"
+          },
+          "day": {
+            "type": "string",
+            "enum": ["MO", "TU", "WE", "TH", "FR", "SA", "SU"],
+            "description": "限制发生在星期几"
+          },
+          "start": {
+            "type": "string",
+            "description": "该时段的开始 HH:MM。整天不可用填 00:00"
+          },
+          "end": {
+            "type": "string",
+            "description": "该时段的结束 HH:MM。整天不可用填 23:59"
+          }
+        }
+      }
+    },
+    "question": {
+      "type": "string",
+      "maxLength": 80,
+      "description": "status=clarify 时, 一次性问清楚最关键的缺失信息(只问一个)"
+    }
+  }
+}

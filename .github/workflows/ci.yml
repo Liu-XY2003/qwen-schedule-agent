@@ -91,6 +91,10 @@ jobs:
         working-directory: bridge
         run: python test_planner.py
 
+      - name: 规划层日期解析（确定性, 不依赖模型）
+        working-directory: bridge
+        run: python test_planning_dates.py
+
       - name: 演示跑一遍（确认能出计划）
         working-directory: bridge
         run: python planner.py

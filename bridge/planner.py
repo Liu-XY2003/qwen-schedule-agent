@@ -115,6 +115,7 @@ class Weights:
     """软约束权重。数值是"多少分钟的偏差等价于 1 分惩罚"的倒数关系, 便于调。"""
     preferred_window: int = 40     # 不在偏好时段的每分钟
     daily_load: int = 6            # 每天超出负荷上限的每分钟
+    daily_soft: int = 3            # 超出"舒适负荷"的每分钟（引导分散, 别把人排爆）
     stability: int = 3             # 相对上一版计划偏移的每分钟
     priority: int = 2              # 高优先级任务的开始时刻（越早越好）
     chunking: int = 15             # 每多拆一块的固定惩罚（少拆更连贯）
@@ -146,6 +147,7 @@ def plan(
     week_start: datetime | None = None,
     windows: dict[int, list[DayWindow]] | None = None,
     daily_load_cap_min: int = 8 * 60,
+    daily_comfort_min: int = 4 * 60,
     buffer_min: int = 10,
     weights: Weights = Weights(),
     max_seconds: float = 5.0,
@@ -159,14 +161,14 @@ def plan(
     ws = _monday_of(week_start or datetime.now())
     windows = windows or DEFAULT_WINDOWS
 
-    res = _solve(tasks, fixed, ws, windows, daily_load_cap_min, buffer_min,
-                 weights, max_seconds, soften=False)
+    res = _solve(tasks, fixed, ws, windows, daily_load_cap_min, daily_comfort_min,
+                 buffer_min, weights, max_seconds, soften=False)
     if res.feasible or not explain:
         return res
 
     # 不可行 -> 软化硬约束重解, 找出是哪几条在打架
-    soft = _solve(tasks, fixed, ws, windows, daily_load_cap_min, buffer_min,
-                  weights, max_seconds, soften=True)
+    soft = _solve(tasks, fixed, ws, windows, daily_load_cap_min, daily_comfort_min,
+                  buffer_min, weights, max_seconds, soften=True)
     res.violations = soft.violations
     res.note = "无可行解；以下是与之冲突的约束"
     return res
@@ -185,7 +187,8 @@ def _dt_from_min(m: int, ws: datetime) -> datetime:
     return ws + timedelta(minutes=int(m))
 
 
-def _solve(tasks, fixed, ws, windows, load_cap, buffer_min, w: Weights, max_seconds, *, soften: bool):
+def _solve(tasks, fixed, ws, windows, load_cap, comfort, buffer_min, w: Weights,
+           max_seconds, *, soften: bool):
     import time as _t
     t0 = _t.perf_counter()
 
@@ -321,9 +324,16 @@ def _solve(tasks, fixed, ws, windows, load_cap, buffer_min, w: Weights, max_seco
         if load_terms:
             load = model.NewIntVar(0, MIN_PER_DAY, f"load_{day}")
             model.Add(load == sum(load_terms))
+            # 硬性: 超过 load_cap 重罚（基本等于不允许）
             over = model.NewIntVar(0, MIN_PER_DAY, f"over_{day}")
             model.AddMaxEquality(over, [0, load - load_cap])
             penalties.append((w.daily_load, over))
+            # 软性: 超过"舒适负荷"轻罚 —— 引导任务分散到各天,
+            # 否则求解器会把所有事都塞进最早的一天（合法但没用）
+            if comfort is not None and comfort < load_cap:
+                over_c = model.NewIntVar(0, MIN_PER_DAY, f"overc_{day}")
+                model.AddMaxEquality(over_c, [0, load - comfort])
+                penalties.append((w.daily_soft, over_c))
 
     model.Minimize(sum(wt * var for wt, var in penalties))
 
