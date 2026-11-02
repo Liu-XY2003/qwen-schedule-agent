@@ -26,7 +26,9 @@ $llmLog = "$Local\llama-server.log"
 $llm = Start-Process -FilePath "$Llama\llama-server.exe" `
     -ArgumentList @('-m', $Model, '-ngl', '99', '-c', '2048',
                     '--host', '127.0.0.1', '--port', "$LLMPort",
-                    '--jinja', '-np', '1') `
+                    '--jinja', '-np', '1',
+                    # 关掉 Qwen3 思考模式: 结构化抽取用不上, 实测快 3.6 倍
+                    '--reasoning', 'off') `
     -WorkingDirectory $Llama -PassThru -WindowStyle Hidden `
     -RedirectStandardOutput $llmLog -RedirectStandardError "$Local\llama-server.err.log"
 Write-Host "  pid=$($llm.Id)  日志: $llmLog"

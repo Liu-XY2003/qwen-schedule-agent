@@ -315,8 +315,13 @@ def resolve_time(when: dict | None, now: datetime) -> Resolved:
     # 本周已过的星期几 -> 顺延到下周同一天(用户说"周一"时今天是周二, 几乎必然指下一个周一);
     # 其它情况(如 absolute 过去日期) -> 保留但标记 is_past, 交由上层决定是否确认。
     if start <= now:
-        # 星期类: 本周已过的日子顺延(用户说"周一"而今天是周三, 几乎必然指下一个周一)
-        if when.get("date_kind") == "weekday" and int(when.get("week_offset") or 0) <= 0:
+        # 星期类: 仅当用户说的是"本周"(week_offset == 0) 且该天已过, 才顺延到下周。
+        # (用户说"周一"而今天是周三, 几乎必然指下一个周一)
+        #
+        # ★ 负数偏移代表用户**明确说了过去**("上周二""上上周三"), 必须原样保留并标记
+        #   is_past, 由上层决定怎么提示。曾经这里写的是 <= 0, 结果"上周二"被顺延成
+        #   下周二同一天 —— 相差整整一周, 而界面上完全看不出来。
+        if when.get("date_kind") == "weekday" and int(when.get("week_offset") or 0) == 0:
             start += timedelta(days=7)
             reasons.append("本周该天已过, 顺延到下周同一天")
         else:

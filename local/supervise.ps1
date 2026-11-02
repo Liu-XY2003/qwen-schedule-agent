@@ -120,7 +120,12 @@ function Start-Llama {
     $p = Start-Process -FilePath "$LlamaDir\llama-server.exe" `
         -ArgumentList @('-m', $Model, '-ngl', '99', '-c', '2048',
                         '--host', '127.0.0.1', '--port', "$LlamaPort",
-                        '--jinja', '-np', '1') `
+                        '--jinja', '-np', '1',
+                        # ★ 必须关掉 Qwen3 的思考模式。
+                        #   实测: 开着时模型把整个 token 预算都耗在 reasoning 上,
+                        #   4B 上甚至一个正文字都不输出。关掉后输出逐字一致,
+                        #   延迟 ~1900ms -> ~526ms (3.6 倍)。
+                        '--reasoning', 'off') `
         -WorkingDirectory $LlamaDir -PassThru -WindowStyle Hidden `
         -RedirectStandardOutput $outLog -RedirectStandardError $errLog
     Write-Log "  pid=$($p.Id)"
