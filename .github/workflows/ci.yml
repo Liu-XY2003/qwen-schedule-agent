@@ -99,6 +99,34 @@ jobs:
         working-directory: bridge
         run: python planner.py
 
+  # ---------------------------------------------------------------- 规划训练数据
+  # 训练本身要 GPU, CI 里跑不了; 但**数据集正确性**可以, 而且必须 ——
+  # 反向构造的全部价值就建立在"标签一定对"之上。
+  planning-data:
+    name: 规划训练数据（标签正确性）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 训练用 SYS 与推理用 SYS 一致
+        working-directory: pod
+        run: python test_sys_consistency.py
+
+      - name: 校验器自测（证明它能抓到错误、也不误报）
+        working-directory: pod
+        run: python test_verify_catches_errors.py
+
+      - name: 生成数据集并校验标签
+        working-directory: pod
+        run: |
+          python gen_planning_dataset.py --train 2000 --test 200 --outdir /tmp/plandata
+          python verify_planning_dataset.py /tmp/plandata/train.jsonl
+          python verify_planning_dataset.py /tmp/plandata/test.jsonl
+
   # ---------------------------------------------------------------- 访问控制
   auth:
     name: 访问控制 (起真实服务)

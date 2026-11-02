@@ -1,10 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Qwen3-0.6B LoRA 微调: 中文自然语言 -> 结构化日程工具调用
+Qwen3 LoRA 微调: 中文自然语言 -> 结构化 JSON（日程命令 / 规划抽取 通用）
+
+一份脚本训两种任务:
+    一阶段 schedule_command:  --train train.jsonl  (gen_dataset.py 生成)
+    二阶段 planning_request:  --train plan_train.jsonl (gen_planning_dataset.py 生成)
+任务差别只在数据集的 system prompt 和标签格式, 训练机制完全一样 —— 所以不复制脚本,
+避免两份代码各自漂移。
 
 设计要点:
-  1. 基座直接读镜像预置的 /model/ModelScope/Qwen/Qwen3-0.6B, 不下载
+  1. 基座用 --model 指定（默认读镜像预置的 0.6B）, 不下载
   2. 只在 assistant 段算 loss (prompt 全部 mask 成 -100), 否则模型会学会复读用户输入
   3. 训练文本走 Qwen3 官方 chat template 且 enable_thinking=False,
      与推理时完全一致 (否则会出现 train/inference 不一致的 think 块)
@@ -130,7 +136,7 @@ def main():
     scaler = torch.amp.GradScaler("cuda", enabled=(a.precision == "fp16"))
 
     print("=" * 84, flush=True)
-    print(f"Qwen3-0.6B LoRA 微调 | 设备 {torch.cuda.get_device_name(0)} "
+    print(f"{os.path.basename(a.model.rstrip('/'))} LoRA 微调 | 设备 {torch.cuda.get_device_name(0)} "
           f"(sm_{''.join(map(str, torch.cuda.get_device_capability(0)))})", flush=True)
     print(f"精度={a.precision} | amp={use_amp} | GradScaler={scaler.is_enabled()}", flush=True)
     print("=" * 84, flush=True)
