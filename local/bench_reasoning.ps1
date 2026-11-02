@@ -2,7 +2,7 @@
 $ErrorActionPreference = 'Continue'
 $Root = 'D:\Projects\qwen-local-tool-agent'
 $Llama = "$Root\bench\llama\llama-server.exe"
-$Py = 'C:\Users\zaoch\anaconda3\python.exe'
+$Py = '$env:USERPROFILE\anaconda3\python.exe'
 $Port = 18999
 $Model = "$Root\bench\Qwen3-4B-Q4_K_M.gguf"
 

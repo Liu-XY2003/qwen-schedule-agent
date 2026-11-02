@@ -65,6 +65,30 @@ jobs:
         working-directory: bridge
         run: python test_theme_consistency.py
 
+  # ---------------------------------------------------------------- 规划求解器
+  planner:
+    name: 规划求解器 (CP-SAT)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # 求解器是二阶段"确定性"的那一半, 不依赖模型, 可以完整地在 CI 里跑。
+      # 本地建议用独立 venv（见 bridge/requirements-planner.txt），CI 是干净环境, 直接装即可。
+      - name: 安装 OR-Tools
+        run: pip install -r bridge/requirements-planner.txt
+
+      - name: 规划器性质测试
+        working-directory: bridge
+        run: python test_planner.py
+
+      - name: 演示跑一遍（确认能出计划）
+        working-directory: bridge
+        run: python planner.py
+
   # ---------------------------------------------------------------- 访问控制
   auth:
     name: 访问控制 (起真实服务)

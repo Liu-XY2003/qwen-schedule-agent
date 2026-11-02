@@ -30,8 +30,8 @@ function Add-Finding {
 # ★ 必须在**遍历时**就剪枝: backup/ 有 1GB、bench/llama 是整套 llama.cpp 构建产物,
 #   先全量 Get-ChildItem -Recurse 再过滤要跑几分钟 (实测直接超时)。
 $skipDirs = @('.git', 'node_modules', '.gradle', 'build', '.idea', '.dsh', '.kotlin',
-              'backup', 'bench', 'models', 'venv', '.venv', '__pycache__',
-              '.pytest_cache', 'screenshots',
+              'backup', 'bench', 'models', 'venv', '.venv', '.venv-planner',
+              '__pycache__', '.pytest_cache', 'screenshots',
               # 已 gitignore 的数据目录: 公开数据集下载物 + 生成的数据集
               'external', 'generated',
               # Release 资产暂存 (GGUF/APK 走 Release 不进 git) + 开源整理归档

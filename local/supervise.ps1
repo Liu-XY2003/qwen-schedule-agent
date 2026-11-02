@@ -38,10 +38,11 @@ $MaxLogMB  = 4
 #     所以这里主动探测一个确实能 import uvicorn 的解释器。
 function Resolve-Python {
     $cands = @(
-        'C:\Users\zaoch\anaconda3\python.exe',
+        # 用环境变量拼, 不写死本机用户名 (仓库要公开)
         "$env:USERPROFILE\anaconda3\python.exe",
         "$env:LOCALAPPDATA\Programs\Python\Python312\python.exe",
-        "$env:LOCALAPPDATA\Programs\Python\Python311\python.exe"
+        "$env:LOCALAPPDATA\Programs\Python\Python311\python.exe",
+        "$env:USERPROFILE\miniconda3\python.exe"
     )
     foreach ($c in @('python.exe', 'python3.exe')) {
         Get-Command $c -ErrorAction SilentlyContinue | ForEach-Object { $cands += $_.Source }

@@ -1,7 +1,7 @@
 ﻿# 在临时数据库上跑 21 条验收, 不碰真实日历
 $ErrorActionPreference = 'Continue'
 $Root = 'D:\Projects\qwen-local-tool-agent'
-$Py   = 'C:\Users\zaoch\anaconda3\python.exe'
+$Py   = '$env:USERPROFILE\anaconda3\python.exe'
 $Db   = "$env:TEMP\sched_acc.db"
 $Port = 8903
 

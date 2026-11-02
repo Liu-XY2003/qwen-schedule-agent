@@ -1,0 +1,21 @@
+# 规划求解器依赖（二阶段）
+#
+# ★ 单独一个文件, 不和 bridge/requirements.txt 混在一起:
+#   推理/网页那一套只需要 fastapi/uvicorn/pydantic, 几秒钟装完;
+#   ortools 会带进 pandas/numpy, 体积大, 而且**容易和已有的科学计算环境冲突**
+#   （实测本机 anaconda 里 numpy 2.x 与旧 pandas 不兼容, 直接 import 就崩）。
+#
+# 所以建议**给求解器单独一个虚拟环境**:
+#
+#   python -m venv .venv-planner
+#   .venv-planner\Scripts\python.exe -m pip install -r bridge\requirements-planner.txt
+#   .venv-planner\Scripts\python.exe bridge\planner.py            # 跑演示
+#   .venv-planner\Scripts\python.exe bridge\test_planner.py       # 跑测试
+#
+# 国内网络建议加镜像:  -i https://pypi.tuna.tsinghua.edu.cn/simple
+
+ortools>=9.10
+
+# 注意: ortools 的 cp_model 会 import pandas, 所以 pandas 是隐式依赖。
+# 上面用独立 venv 的主要目的就是让 pip 自己解析出一组互相兼容的
+# numpy / pandas 版本, 不去动宿主环境。
