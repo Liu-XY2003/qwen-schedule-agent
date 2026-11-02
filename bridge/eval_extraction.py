@@ -255,16 +255,19 @@ def main() -> int:
     ap.add_argument("--label", default="")
     ap.add_argument("--limit", type=int, default=0)
     g = ap.add_mutually_exclusive_group()
-    g.add_argument("--fewshot", dest="fewshot", action="store_true", default=True,
-                   help="对话里带两个示例（默认）")
-    g.add_argument("--zero-shot", dest="fewshot", action="store_false",
+    g.add_argument("--fewshot", dest="fewshot", action="store_const", const="lite",
+                   help="两个示例")
+    g.add_argument("--fewshot-rich", dest="fewshot", action="store_const", const="rich",
+                   help="五个示例, 覆盖已知失败模式（推荐）")
+    g.add_argument("--zero-shot", dest="fewshot", action="store_const", const=False,
                    help="不带示例, 测基座模型零样本能力")
+    ap.set_defaults(fewshot="rich")
     args = ap.parse_args()
     url = f"http://127.0.0.1:{args.port}"
 
     cases = CASES[: args.limit] if args.limit else CASES
     passed = 0
-    mode = "few-shot" if args.fewshot else "零样本"
+    mode = {False: "零样本", "lite": "few-shot×2", "rich": "few-shot×5"}[args.fewshot]
     print(f"\n{'='*84}\n抽取评估: {args.label} [{mode}]  ({len(cases)} 条)\n{'='*84}")
     for i, c in enumerate(cases, 1):
         ok, why, _ = run_case(c, url, fewshot=args.fewshot)

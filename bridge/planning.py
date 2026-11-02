@@ -56,6 +56,12 @@ SYS = (
 
 
 # ---------------------------------------------------------------- 抽取
+def set_llama_url(url: str) -> None:
+    """切换推理地址（评测脚本要连不同端口的模型）。"""
+    global LLAMA_URL
+    LLAMA_URL = url.rstrip("/")
+
+
 def _post(payload: dict, timeout: float = 180.0) -> dict:
     body = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(
@@ -66,19 +72,23 @@ def _post(payload: dict, timeout: float = 180.0) -> dict:
 
 
 def extract(text: str, *, llama_url: str | None = None,
-            max_tokens: int = 512, fewshot: bool = True) -> dict:
+            max_tokens: int = 512, fewshot: str | bool = "rich") -> dict:
     """文本 → planning_request 信封。失败抛异常。
 
-    fewshot: 是否在对话里塞两个示例。实测**必须开** —— 未经微调的基座模型
-    面对这个复杂度的新契约, 零样本几乎一律输出 status=reject(1.7B 只有 14%)。
-    两个 user/assistant 示例就能把它拉到可用水平。
+    fewshot: False/"none" 不带示例; True/"lite" 两个; "rich" 五个(默认)。
+    实测**必须开** —— 未经微调的基座模型面对这个复杂度的新契约, 零样本几乎一律
+    输出 status=reject(1.7B 只有 14%)。示例覆盖多件事/约束/拒答/追问四类关键形态
+    后准确率明显提升(见 docs/extraction-benchmark.md)。
+    微调之后应改用 fewshot=False, 让 prompt 短下来、更快。
     """
     global LLAMA_URL
     if llama_url:
         LLAMA_URL = llama_url.rstrip("/")
     messages = [{"role": "system", "content": SYS}]
-    if fewshot:
+    if fewshot in (True, "lite", "fewshot"):
         messages += FEWSHOT
+    elif fewshot == "rich":
+        messages += FEWSHOT_RICH
     messages.append({"role": "user", "content": text})
     payload = {
         "model": "x",
@@ -99,7 +109,18 @@ def extract(text: str, *, llama_url: str | None = None,
 
 
 # ★ few-shot 示例也是契约的一部分: 与 SYS 一起决定模型的行为。
-#   示例覆盖三种关键形态(正常抽多件事 / 应拒答 / 应追问), 少一个都会偏。
+#
+# 两档:
+#   FEWSHOT       2 个例子（正常抽 / 应拒答）。最省 token, 但没覆盖"多件事"——
+#                 而多件事恰恰是实测失败最多的一类。
+#   FEWSHOT_RICH  5 个例子, 逐个覆盖已知失败模式:
+#                 ① 多件事 + 时长分散在句子里（最常见的失败）
+#                 ② keep_free 约束（最常漏抽）
+#                 ③ 应拒答
+#                 ④ 应追问
+#                 ⑤ 单件事 + 明确截止（基准能力）
+# 微调之后应改用 fewshot=False, 让 prompt 短下来。
+
 FEWSHOT = [
     {"role": "user", "content":
         "周五前把设计文档发出去，大概三小时。周三上午别给我排事，要陪家人。"},
@@ -120,6 +141,45 @@ FEWSHOT = [
         "status": "reject", "items": [], "constraints": [],
     }, ensure_ascii=False, separators=(",", ":"))},
 ]
+
+
+def _fs(user, env):
+    return [{"role": "user", "content": user},
+            {"role": "assistant", "content": json.dumps(
+                env, ensure_ascii=False, separators=(",", ":"))}]
+
+
+# ① 多件事 + 时长分散（最常见的失败模式：只抽到一两件）
+_FS_MULTI = _fs(
+    "这周要做三件事：写完操作系统实验报告，大概要四个小时；读两篇论文，每篇一小时；"
+    "再写个周报，半小时。",
+    {"status": "ok", "items": [
+        {"title": "操作系统实验报告", "duration_min": 240, "priority": "normal",
+         "splittable": True, "preferred": "none"},
+        {"title": "读论文", "duration_min": 60, "priority": "normal",
+         "splittable": True, "preferred": "none"},
+        {"title": "周报", "duration_min": 30, "priority": "normal",
+         "splittable": True, "preferred": "none"},
+    ], "constraints": []})
+
+# ② 只说了约束、没说时长（约束最容易漏抽）
+_FS_CONSTRAINT = _fs(
+    "周五晚上绝对不要给我排事，我要休息。白天可以看看论文，两小时。",
+    {"status": "ok", "items": [
+        {"title": "看论文", "duration_min": 120, "priority": "normal",
+         "splittable": True, "preferred": "none"},
+    ], "constraints": [
+        {"kind": "keep_free", "weight": "hard",
+         "day": "FR", "start": "19:00", "end": "22:00"},
+    ]})
+
+# ④ 应追问（信息不足但用户确实想安排）
+_FS_CLARIFY = _fs(
+    "帮我安排一下这周的事情。",
+    {"status": "clarify", "items": [], "constraints": [],
+     "question": "你想安排哪几件事？每件大概需要多久？"})
+
+FEWSHOT_RICH = (_FS_MULTI + _FS_CONSTRAINT + FEWSHOT + _FS_CLARIFY)
 
 
 def validate(env: dict) -> None:
