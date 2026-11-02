@@ -29,22 +29,36 @@ ROOTS = [
 ]
 SKIP_DIRS = {".git", "build", ".gradle", ".idea", ".kotlin", "_archive", "_release",
              "backup", "bench", "models", "node_modules", "__pycache__", ".dsh",
-             "external", "generated"}
+             "external", "generated",
+             # 虚拟环境里全是第三方库, 扫它没有意义（会有上千条 __author__ 邮箱误报）
+             ".venv", "venv", ".venv-planner", "site-packages"}
 TEXT_EXT = {".md", ".py", ".kt", ".kts", ".ps1", ".sh", ".json", ".xml", ".yml",
             ".yaml", ".toml", ".properties", ".txt", ".service", ".gitignore",
             ".gitattributes", ".cfg", ".ini", ""}
 
-RULES = [
+# 分级: HIGH = 真能定位到具体的人, CI 里必须失败;
+#       INFO = 可能相关但通常无害（示例数据、通用词汇），只提示。
+# 不分级的话, 一堆"学院""取件码"之类的误报会让这个工具在 CI 里没法用。
+HIGH_RULES = [
     ("邮箱", re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")),
     ("手机号", re.compile(r"(?<!\d)1[3-9]\d{9}(?!\d)")),
-    ("身份证号", re.compile(r"(?<!\d)\d{17}[\dXx](?!\d)")),
+    # 真实身份证 = 6 位地区码 + 8 位出生日期 + 3 位顺序码 + 1 位校验码。
+    # 只数位宽会把 SHA256 哈希里的连续数字也误判成身份证。
+    ("身份证号", re.compile(
+        r"(?<!\d)[1-9]\d{5}(19|20)\d{2}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])\d{3}[\dXx](?!\d)")),
     ("可能的真实姓名(拼音)", re.compile(r"\b(liu[\s_-]?xiang[\s_-]?yang|zhang[\s_-]?san)\b", re.I)),
     ("本机用户名路径", re.compile(r"[\\/](Users|home)[\\/](zaoch|zao|liuxinyang)\b", re.I)),
-    ("学校/学院关键词", re.compile(
-        r"(北京[^\s,，。]{0,6}(大学|学院)|XX大学|学院|教务处|校团委|软件学院)")),
     ("学号样式", re.compile(r"\b(20\d{8}|U20\d{6})\b")),
-    ("实验室/门禁/密码", re.compile(r"(门禁|取件码|密码)[^\n]{0,20}\d{3,}")),
 ]
+
+INFO_RULES = [
+    ("学校/学院字样", re.compile(
+        r"(北京[^\s,，。]{0,6}(大学|学院)|XX大学|学院|教务处|校团委|软件学院)")),
+    ("像凭据的示例数据", re.compile(r"(门禁|取件码|密码)[^\n]{0,20}\d{3,}")),
+]
+
+RULES = HIGH_RULES + INFO_RULES
+HIGH_NAMES = {n for n, _ in HIGH_RULES}
 
 
 def walk(root: Path):
@@ -100,13 +114,16 @@ def git_authors():
 
 
 total, by_rule = scan()
+high_hits = sum(len(v) for k, v in by_rule.items() if k in HIGH_NAMES)
+
 print("=" * 78)
 print("个人信息扫描")
 print("=" * 78)
 if not by_rule:
     print("未发现明显个人信息")
 for name, hits in by_rule.items():
-    print(f"\n[{name}]  {len(hits)} 处")
+    level = "HIGH" if name in HIGH_NAMES else "提示"
+    print(f"\n[{level}] {name}  {len(hits)} 处")
     for h in hits[:12]:
         print("   ", h)
     if len(hits) > 12:
@@ -127,5 +144,9 @@ for root in ROOTS:
             continue
         print("  ", p.relative_to(root.parent))
 
-print(f"\n合计命中 {total} 处")
-sys.exit(1 if total else 0)
+print(f"\n合计 HIGH {high_hits} 处 / 提示 {total - high_hits} 处")
+if high_hits:
+    print("存在能定位到个人的信息, 匿名评审前必须处理。")
+    sys.exit(1)
+print("无 HIGH 项; 提示项请自行确认（示例数据、通用词汇通常可保留）。")
+sys.exit(0)
