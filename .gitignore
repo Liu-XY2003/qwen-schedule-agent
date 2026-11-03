@@ -83,3 +83,7 @@ _release/
 
 # 瑙勫垝姹傝В鍣ㄧ殑闅旂鐜
 .venv-planner/
+
+# 简历/面试材料的 docx 中间产物（pdf 与 md 才是交付物）
+docs/career/*.docx
+
