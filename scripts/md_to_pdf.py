@@ -41,22 +41,34 @@ def style_docx(path: Path, body_pt: float = BODY_PT, table_pt: float = TABLE_PT)
         sec.top_margin = sec.bottom_margin = Cm(2.0)
         sec.left_margin = sec.right_margin = Cm(2.0)
 
-    def fix_run(r, size):
+    def fix_run(r, size, mono=False):
         r.font.size = Pt(size)
+        if mono:
+            # 代码块必须等宽，否则缩进和伪代码对不齐
+            r.font.name = "Consolas"
+            if r._element.rPr is not None and r._element.rPr.rFonts is not None:
+                r._element.rPr.rFonts.set(qn("w:eastAsia"), "宋体")
+            return
         r.font.name = "宋体"
         if r._element.rPr is not None and r._element.rPr.rFonts is not None:
             r._element.rPr.rFonts.set(qn("w:eastAsia"), "宋体")
 
     for p in d.paragraphs:
+        is_code = "Source" in p.style.name or "Code" in p.style.name
         pf = p.paragraph_format
         pf.space_before = Pt(0)
         pf.space_after = Pt(2)
         pf.line_spacing = 1.0
         for r in p.runs:
-            fix_run(r, body_pt)
+            fix_run(r, body_pt - 0.5 if is_code else body_pt, mono=is_code)
 
     for tb in d.tables:
         for row in tb.rows:
+            # 禁止行内跨页拆分：否则一行会被切成"页底半行 + 页顶半行"，很难看
+            trPr = row._tr.get_or_add_trPr()
+            if trPr.find(qn("w:cantSplit")) is None:
+                from docx.oxml import OxmlElement
+                trPr.append(OxmlElement("w:cantSplit"))
             for cell in row.cells:
                 for p in cell.paragraphs:
                     p.paragraph_format.space_before = Pt(0)
