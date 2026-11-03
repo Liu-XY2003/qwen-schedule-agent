@@ -87,6 +87,12 @@ jobs:
       - name: 安装 OR-Tools
         run: pip install -r bridge/requirements-planner.txt
 
+      # MCP 工具定义必须与 JSON Schema 同源（"一份 Schema 四处消费"的第四处）
+      - name: MCP 工具契约与 Schema 一致
+        run: |
+          pip install mcp
+          python bridge/mcp_server.py --selftest
+
       - name: 规划器性质测试
         working-directory: bridge
         run: python test_planner.py
