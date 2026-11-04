@@ -187,6 +187,31 @@ function Start-App {
     return $false
 }
 
+# ---------------------------------------------------------------- -Stop
+#
+# ★ 必须放在单实例锁检查**之前**。
+#   否则带着 -Stop 调用时, 会先撞上"另一个守候进程已在运行"直接 exit 0,
+#   什么也没停 —— 用户会看到"停止成功"但服务 20 秒后又活过来。
+if ($Stop) {
+    Write-Log "=== 停止服务 (-Stop) ==="
+    if (Test-Path $LockFile) {
+        $old = (Get-Content $LockFile -ErrorAction SilentlyContinue | Select-Object -First 1)
+        $oldPid = 0
+        if ([int]::TryParse("$old", [ref]$oldPid) -and $oldPid -gt 0 -and $oldPid -ne $PID) {
+            if (Get-Process -Id $oldPid -ErrorAction SilentlyContinue) {
+                Write-Log "  停止守候进程 pid=$oldPid"
+                Stop-Process -Id $oldPid -Force -ErrorAction SilentlyContinue
+                Start-Sleep -Milliseconds 600
+            }
+        }
+    }
+    Stop-Port $AppPort '手动停止' | Out-Null
+    Stop-Port $LlamaPort '手动停止' | Out-Null
+    Remove-Item $LockFile -Force -ErrorAction SilentlyContinue
+    Write-Log "已停止"
+    exit 0
+}
+
 # ---------------------------------------------------------------- 单实例锁
 
 if (Test-Path $LockFile) {
@@ -201,17 +226,6 @@ if (Test-Path $LockFile) {
     Remove-Item $LockFile -Force -ErrorAction SilentlyContinue
 }
 $PID | Out-File $LockFile -Encoding ASCII
-
-# ---------------------------------------------------------------- -Stop
-
-if ($Stop) {
-    Write-Log "=== 停止服务 (-Stop) ==="
-    Stop-Port $AppPort '手动停止' | Out-Null
-    Stop-Port $LlamaPort '手动停止' | Out-Null
-    Remove-Item $LockFile -Force -ErrorAction SilentlyContinue
-    Write-Log "已停止"
-    exit 0
-}
 
 # ---------------------------------------------------------------- 主流程
 
