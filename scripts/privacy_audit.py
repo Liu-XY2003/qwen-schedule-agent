@@ -16,6 +16,7 @@
 """
 from __future__ import annotations
 
+import os
 import re
 import subprocess
 import sys
@@ -23,10 +24,14 @@ from pathlib import Path
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace") if hasattr(sys.stdout, "reconfigure") else None
 
-ROOTS = [
-    Path(r"D:\Projects\qwen-local-tool-agent"),
-    Path(r"D:\Projects\AI_ScheduleAssistant"),
-]
+# ★ 不能写死本机绝对路径: 写死后在 CI（Linux runner）上这些路径都不存在,
+#   脚本会把所有根目录跳过, 报 "HIGH 0 处" 然后 exit 0 —— 检查形同虚设。
+#   改为: 默认扫脚本所在仓库, 另外把同级的 Android 仓库也带上(如果存在)。
+_HERE = Path(__file__).resolve().parent.parent
+_SIBLINGS = [_HERE.parent / "AI_ScheduleAssistant"]
+ROOTS = [_HERE] + [d for d in _SIBLINGS if d.is_dir()]
+if os.environ.get("PRIVACY_ROOTS"):
+    ROOTS = [Path(x) for x in os.environ["PRIVACY_ROOTS"].split(os.pathsep) if x]
 SKIP_DIRS = {".git", "build", ".gradle", ".idea", ".kotlin", "_archive", "_release",
              "backup", "bench", "models", "node_modules", "__pycache__", ".dsh",
              "external", "generated",
@@ -75,6 +80,13 @@ def walk(root: Path):
         yield p
 
 
+def scan_files():
+    for root in ROOTS:
+        if not root.exists():
+            continue
+        yield from walk(root)
+
+
 def scan():
     total = 0
     by_rule: dict[str, list[str]] = {}
@@ -115,6 +127,14 @@ def git_authors():
 
 total, by_rule = scan()
 high_hits = sum(len(v) for k, v in by_rule.items() if k in HIGH_NAMES)
+
+# ★ 什么都没扫到 = 检查没生效, 必须报错。
+#   第一版在 CI 上就是因为路径不存在导致 0 文件被扫, 却安静地"通过"了。
+scanned = sum(1 for _ in scan_files())
+if scanned == 0:
+    print(f"扫描了 0 个文件 —— 检查没有生效！ROOTS={ROOTS}")
+    sys.exit(2)
+print(f"（已扫描 {scanned} 个文本文件）")
 
 print("=" * 78)
 print("个人信息扫描")

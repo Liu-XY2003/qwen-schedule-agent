@@ -18,15 +18,18 @@ import sys
 import tempfile
 from pathlib import Path
 
+# 本机用户目录。不写死用户名 —— 否则公开仓库里就暴露了。
+_UP = str(Path.home())
+
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 from docx import Document  # noqa: E402
 from docx.oxml.ns import qn  # noqa: E402
 from docx.shared import Cm, Pt  # noqa: E402
 
 PANDOC = r"C:\Program Files\Pandoc\pandoc.exe"
-NODE = (r"C:\Users\zaoch\AppData\Local\Programs\DeepSeek Harness\resources"
+NODE = (rf"{_UP}\AppData\Local\Programs\DeepSeek Harness\resources"
         r"\runtime\primary-runtime\dependencies\node\bin\node.exe")
-CLI = (r"C:\Users\zaoch\AppData\Local\Programs\DeepSeek Harness\resources"
+CLI = (rf"{_UP}\AppData\Local\Programs\DeepSeek Harness\resources"
        r"\app.asar.unpacked\dsh\node_modules\@deepseek-ai\libreoffice-kit\lib\cli.js")
 
 BODY_PT = 12          # 小四

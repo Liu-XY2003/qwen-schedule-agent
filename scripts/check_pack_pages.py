@@ -1,3 +1,8 @@
+from pathlib import Path
+
+# 本机用户目录。不写死用户名 —— 否则公开仓库里就暴露了。
+_UP = str(Path.home())
+
 import pathlib
 import re
 import subprocess
@@ -17,9 +22,9 @@ punct = sum(1 for c in t if c in "，。；：、（）「」【】—“”‘�
 words = len(re.findall(r"[A-Za-z0-9][A-Za-z0-9._/+#%=-]*", t))
 print(f"字数: 汉字 {hanzi} + 标点 {punct} + 英文 {words} = {hanzi+punct+words}")
 
-DPY = r"C:\Users\zaoch\.dsh\dsh-runtimes\dsh-primary-runtime\dependencies\python\python.exe"
-NODE = r"C:\Users\zaoch\AppData\Local\Programs\DeepSeek Harness\resources\runtime\primary-runtime\dependencies\node\bin\node.exe"
-CLI = r"C:\Users\zaoch\AppData\Local\Programs\DeepSeek Harness\resources\app.asar.unpacked\dsh\node_modules\@deepseek-ai\libreoffice-kit\lib\cli.js"
+DPY = rf"{_UP}\.dsh\dsh-runtimes\dsh-primary-runtime\dependencies\python\python.exe"
+NODE = rf"{_UP}\AppData\Local\Programs\DeepSeek Harness\resources\runtime\primary-runtime\dependencies\node\bin\node.exe"
+CLI = rf"{_UP}\AppData\Local\Programs\DeepSeek Harness\resources\app.asar.unpacked\dsh\node_modules\@deepseek-ai\libreoffice-kit\lib\cli.js"
 
 # 用简历同款版式（A4/小四/2cm/单倍行距）量，比 pandoc 默认更贴近真实阅读
 subprocess.run([DPY, str(ROOT / "scripts" / "layout_measure.py"), str(MD)], capture_output=True)

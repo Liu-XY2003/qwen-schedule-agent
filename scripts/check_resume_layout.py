@@ -1,3 +1,8 @@
+from pathlib import Path
+
+# 本机用户目录。不写死用户名 —— 否则公开仓库里就暴露了。
+_UP = str(Path.home())
+
 import pathlib
 import re
 import subprocess
@@ -19,9 +24,9 @@ total = hanzi + punct + words
 print(f"字数: 汉字 {hanzi} + 标点 {punct} + 英文 {words} = {total}"
       f"  {'OK(500-600)' if 500 <= total <= 600 else '超出/偏少'}")
 
-DPY = r"C:\Users\zaoch\.dsh\dsh-runtimes\dsh-primary-runtime\dependencies\python\python.exe"
-NODE = r"C:\Users\zaoch\AppData\Local\Programs\DeepSeek Harness\resources\runtime\primary-runtime\dependencies\node\bin\node.exe"
-CLI = r"C:\Users\zaoch\AppData\Local\Programs\DeepSeek Harness\resources\app.asar.unpacked\dsh\node_modules\@deepseek-ai\libreoffice-kit\lib\cli.js"
+DPY = rf"{_UP}\.dsh\dsh-runtimes\dsh-primary-runtime\dependencies\python\python.exe"
+NODE = rf"{_UP}\AppData\Local\Programs\DeepSeek Harness\resources\runtime\primary-runtime\dependencies\node\bin\node.exe"
+CLI = rf"{_UP}\AppData\Local\Programs\DeepSeek Harness\resources\app.asar.unpacked\dsh\node_modules\@deepseek-ai\libreoffice-kit\lib\cli.js"
 
 subprocess.run([DPY, str(ROOT / "scripts" / "layout_measure.py"), str(MD)],
                capture_output=True)
