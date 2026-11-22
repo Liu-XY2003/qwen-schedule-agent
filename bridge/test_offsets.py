@@ -18,8 +18,11 @@ CASES = [
     ("下下周二 ★本次bug",    {"date_kind": "weekday", "date_value": "TU", "week_offset": 2}, "2026-10-06"),
     ("下下下周二",            {"date_kind": "weekday", "date_value": "TU", "week_offset": 3}, "2026-10-13"),
     ("下下下下周二",          {"date_kind": "weekday", "date_value": "TU", "week_offset": 4}, "2026-10-20"),
-    ("上周二",               {"date_kind": "weekday", "date_value": "TU", "week_offset": -1}, "2026-09-22"),
-    ("上上周二",             {"date_kind": "weekday", "date_value": "TU", "week_offset": -2}, "2026-09-15"),
+    # ★ 负偏移的期望值曾经写错过：沿用"week_offset<=0 一律顺延一周"的旧行为，
+    #   于是 上周二 被写成 09-22（其实是本周二）、上上周二 被写成 09-15（其实是上周二）。
+    #   修复 resolve_time 之后，上周二 = 09-15、上上周二 = 09-08。
+    ("上周二",               {"date_kind": "weekday", "date_value": "TU", "week_offset": -1}, "2026-09-15"),
+    ("上上周二",             {"date_kind": "weekday", "date_value": "TU", "week_offset": -2}, "2026-09-08"),
     ("下下周三",             {"date_kind": "weekday", "date_value": "WE", "week_offset": 2}, "2026-10-07"),
     # v1 兼容: 旧模型输出 week_ref
     ("v1 week_ref=next 兼容", {"date_kind": "weekday", "date_value": "TU", "week_ref": "next"}, "2026-09-29"),
@@ -36,8 +39,8 @@ CASES = [
 
 ok = bad = 0
 print("=" * 92)
-print(f"v2 偏移解析测试   『现在』= {NOW}  (周三)")
-print("参考: 本周一=09-21 下周二=09-29 下下周二=10-06 下下下周二=10-13")
+print(f"v2 偏移解析测试   『现在』= {NOW}  (周三; 本周一 = 2026-09-21)")
+print("参考: 本周二(已过->顺延)=09-29 · 上周二=09-15 · 上上周二=09-08")
 print("=" * 92)
 for name, when, want in CASES:
     w = dict(when)
@@ -55,3 +58,10 @@ for name, when, want in CASES:
     print(f"{'OK ' if good else 'XX '} {name:<28} 期望 {want}  实际 {got}")
 print("=" * 92)
 print(f"通过 {ok}/{len(CASES)}")
+
+# ★ 失败必须返回非零，否则 CI 一直是绿的而不自知。
+#   （原来这个脚本失败也 exit 0，导致上面两条错期望躺了很久没人发现。）
+if bad:
+    print(f"失败 {bad} 条")
+    sys.exit(1)
+sys.exit(0)
