@@ -13,6 +13,7 @@
 """
 from __future__ import annotations
 
+import re
 import subprocess
 import sys
 import tempfile
@@ -44,6 +45,23 @@ def style_docx(path: Path, body_pt: float = BODY_PT, table_pt: float = TABLE_PT)
         sec.top_margin = sec.bottom_margin = Cm(2.0)
         sec.left_margin = sec.right_margin = Cm(2.0)
 
+    # markdown 的软换行会被 pandoc 渲染成"独立的空格 run"，于是中文段落里出现
+    # "排周计划 要一次处理"这种词间空格。
+    # 处理办法：遇到纯空白的 run，看它前后的字符 —— 两侧都是中文就删掉这个空格；
+    # 只要有一侧是英文/数字就保留（"一个 4B"少了空格会连成一片）。
+    CPUNCT = "，。、；：！？）】」』》"
+
+    def is_cjk(ch: str) -> bool:
+        return ("\u4e00" <= ch <= "\u9fff") or (ch in CPUNCT) or (ch in "（【「『《")
+
+    def drop_soft_break_spaces(runs):
+        for i, r in enumerate(runs):
+            if r.text and r.text.strip() == "":
+                prev = next((x.text for x in reversed(runs[:i]) if x.text.strip()), "")
+                nxt = next((x.text for x in runs[i + 1:] if x.text.strip()), "")
+                if prev and nxt and is_cjk(prev[-1]) and is_cjk(nxt[0]):
+                    r.text = ""
+
     def fix_run(r, size, mono=False):
         r.font.size = Pt(size)
         if mono:
@@ -62,6 +80,8 @@ def style_docx(path: Path, body_pt: float = BODY_PT, table_pt: float = TABLE_PT)
         pf.space_before = Pt(0)
         pf.space_after = Pt(2)
         pf.line_spacing = 1.0
+        if not is_code:
+            drop_soft_break_spaces(p.runs)
         for r in p.runs:
             fix_run(r, body_pt - 0.5 if is_code else body_pt, mono=is_code)
 
